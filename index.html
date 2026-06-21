@@ -1,0 +1,1302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SSC (NWR) Leave Management System</title>
+<style>
+  :root {
+    --navy: #1a2744;
+    --navy-light: #243460;
+    --gold: #c9a84c;
+    --gold-light: #e8c97a;
+    --cream: #f8f6f0;
+    --white: #ffffff;
+    --red: #c0392b;
+    --green: #1e7e34;
+    --gray: #6c757d;
+    --light-gray: #e9ecef;
+    --border: #dee2e6;
+    --shadow: 0 2px 12px rgba(26,39,68,0.12);
+    --radius: 8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--cream); color: #1a2744; min-height: 100vh; }
+
+  /* ── HEADER ── */
+  .header {
+    background: linear-gradient(135deg, var(--navy) 0%, var(--navy-light) 100%);
+    color: var(--white); padding: 0 24px;
+    display: flex; align-items: center; justify-content: space-between;
+    height: 64px; box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  }
+  .header-left { display: flex; align-items: center; gap: 14px; }
+  .emblem { width: 42px; height: 42px; }
+  .header-title h1 { font-size: 15px; font-weight: 700; letter-spacing: 0.5px; }
+  .header-title p { font-size: 11px; opacity: 0.75; }
+  .header-right { display: flex; align-items: center; gap: 12px; }
+  .role-badge {
+    background: var(--gold); color: var(--navy); font-size: 11px;
+    font-weight: 700; padding: 3px 10px; border-radius: 20px; letter-spacing: 0.5px;
+  }
+  .btn-logout {
+    background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3);
+    color: white; padding: 5px 14px; border-radius: 5px; cursor: pointer; font-size: 12px;
+  }
+  .btn-logout:hover { background: rgba(255,255,255,0.25); }
+
+  /* ── LOGIN ── */
+  #loginScreen {
+    min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(135deg, var(--navy) 0%, #0f1c38 100%);
+  }
+  .login-card {
+    background: white; border-radius: 12px; padding: 40px 44px; width: 380px;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.4); text-align: center;
+  }
+  .login-card .emblem-big { width: 64px; margin-bottom: 8px; }
+  .login-card h2 { color: var(--navy); font-size: 18px; margin-bottom: 4px; }
+  .login-card p { color: var(--gray); font-size: 12px; margin-bottom: 28px; }
+  .login-tabs { display: flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; margin-bottom: 20px; }
+  .login-tab {
+    flex: 1; padding: 8px; border: none; background: var(--light-gray);
+    cursor: pointer; font-size: 13px; color: var(--gray);
+  }
+  .login-tab.active { background: var(--navy); color: white; font-weight: 600; }
+  .form-group { margin-bottom: 14px; text-align: left; }
+  .form-group label { font-size: 12px; font-weight: 600; color: var(--navy); display: block; margin-bottom: 4px; }
+  .form-control {
+    width: 100%; padding: 9px 12px; border: 1px solid var(--border);
+    border-radius: 6px; font-size: 13px; outline: none;
+    transition: border-color 0.2s;
+  }
+  .form-control:focus { border-color: var(--navy); box-shadow: 0 0 0 2px rgba(26,39,68,0.1); }
+  .btn-primary {
+    width: 100%; padding: 10px; background: var(--navy); color: white;
+    border: none; border-radius: 6px; font-size: 14px; font-weight: 600;
+    cursor: pointer; transition: background 0.2s; margin-top: 4px;
+  }
+  .btn-primary:hover { background: var(--navy-light); }
+  .login-error { color: var(--red); font-size: 12px; margin-top: 8px; }
+
+  /* ── MAIN APP ── */
+  #app { display: none; }
+  .topbar {
+    background: white; border-bottom: 1px solid var(--border);
+    padding: 12px 24px; display: flex; align-items: center; gap: 12px;
+    flex-wrap: wrap;
+  }
+  .btn {
+    padding: 8px 18px; border-radius: 6px; border: none; font-size: 13px;
+    font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+    transition: all 0.15s;
+  }
+  .btn-add { background: var(--navy); color: white; }
+  .btn-add:hover { background: var(--navy-light); }
+  .btn-gold { background: var(--gold); color: var(--navy); }
+  .btn-gold:hover { background: var(--gold-light); }
+  .btn-sm { padding: 5px 12px; font-size: 12px; }
+  .btn-danger { background: #dc3545; color: white; }
+  .btn-danger:hover { background: #c82333; }
+  .btn-success { background: var(--green); color: white; }
+  .btn-success:hover { background: #155724; }
+  .btn-outline {
+    background: white; color: var(--navy);
+    border: 1.5px solid var(--navy);
+  }
+  .btn-outline:hover { background: var(--navy); color: white; }
+  .search-box {
+    flex: 1; max-width: 280px; padding: 8px 12px;
+    border: 1px solid var(--border); border-radius: 6px; font-size: 13px; outline: none;
+  }
+  .search-box:focus { border-color: var(--navy); }
+
+  /* ── EMPLOYEE CARDS ── */
+  .content { padding: 20px 24px; }
+  .section-title {
+    font-size: 13px; font-weight: 700; color: var(--gray);
+    text-transform: uppercase; letter-spacing: 1px; margin-bottom: 14px;
+  }
+  .employees-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 16px;
+  }
+  .emp-card {
+    background: white; border-radius: var(--radius); padding: 18px 20px;
+    box-shadow: var(--shadow); border-left: 4px solid var(--gold);
+    transition: transform 0.15s, box-shadow 0.15s; cursor: pointer;
+  }
+  .emp-card:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(26,39,68,0.18); }
+  .emp-card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+  .emp-name { font-size: 15px; font-weight: 700; color: var(--navy); }
+  .emp-desig { font-size: 12px; color: var(--gray); margin-top: 2px; }
+  .gender-badge {
+    font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 10px;
+    background: var(--light-gray); color: var(--gray);
+  }
+  .leave-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .chip {
+    font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 20px;
+    background: var(--cream); color: var(--navy); border: 1px solid var(--border);
+  }
+  .chip.el { background: #dbeafe; color: #1e40af; border-color: #bfdbfe; }
+  .chip.hpl { background: #ede9fe; color: #5b21b6; border-color: #ddd6fe; }
+  .chip.cl { background: #dcfce7; color: #166534; border-color: #bbf7d0; }
+  .emp-card-actions { display: flex; gap: 8px; margin-top: 14px; }
+
+  /* ── MODAL ── */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 1000; padding: 16px;
+  }
+  .modal {
+    background: white; border-radius: 10px; width: 100%; max-width: 620px;
+    max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+  }
+  .modal-lg { max-width: 820px; }
+  .modal-header {
+    background: var(--navy); color: white; padding: 16px 22px;
+    display: flex; justify-content: space-between; align-items: center;
+    border-radius: 10px 10px 0 0; position: sticky; top: 0; z-index: 1;
+  }
+  .modal-header h3 { font-size: 15px; font-weight: 700; }
+  .modal-close {
+    background: none; border: none; color: white; font-size: 22px;
+    cursor: pointer; line-height: 1; opacity: 0.8;
+  }
+  .modal-close:hover { opacity: 1; }
+  .modal-body { padding: 22px; }
+  .modal-footer { padding: 14px 22px; border-top: 1px solid var(--border); display: flex; gap: 10px; justify-content: flex-end; }
+
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .form-full { grid-column: 1 / -1; }
+  .form-group label { font-size: 12px; font-weight: 600; color: var(--navy); display: block; margin-bottom: 4px; }
+  .form-group label span { color: var(--red); }
+  select.form-control { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%236c757d'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; padding-right: 28px; }
+
+  /* ── LEAVE SECTION ── */
+  .leave-section-header {
+    background: var(--navy); color: white; padding: 10px 16px;
+    border-radius: 6px 6px 0 0; font-size: 13px; font-weight: 700;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .leave-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+  .leave-table th {
+    background: var(--light-gray); padding: 8px 10px; font-size: 11px;
+    font-weight: 700; color: var(--navy); text-align: left; border-bottom: 2px solid var(--border);
+  }
+  .leave-table td {
+    padding: 8px 10px; font-size: 12px; border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+  }
+  .leave-table tr:hover td { background: #f8f9ff; }
+
+  /* ── PROFILE VIEW ── */
+  .profile-header {
+    background: linear-gradient(135deg, var(--navy), var(--navy-light));
+    color: white; padding: 24px 22px; border-radius: 10px 10px 0 0;
+  }
+  .profile-name { font-size: 22px; font-weight: 700; }
+  .profile-meta { font-size: 13px; opacity: 0.8; margin-top: 4px; }
+  .profile-tabs { display: flex; border-bottom: 2px solid var(--border); padding: 0 22px; background: white; }
+  .profile-tab {
+    padding: 12px 18px; cursor: pointer; font-size: 13px; font-weight: 600;
+    color: var(--gray); border-bottom: 2px solid transparent; margin-bottom: -2px;
+  }
+  .profile-tab.active { color: var(--navy); border-bottom-color: var(--gold); }
+
+  /* ── SUMMARY ── */
+  .summary-box {
+    background: white; border-radius: var(--radius); padding: 18px;
+    border: 1px solid var(--border); margin-bottom: 14px;
+  }
+  .summary-box h4 { font-size: 13px; font-weight: 700; color: var(--navy); margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+  .summary-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 13px; border-bottom: 1px solid #f0f0f0; }
+  .summary-row:last-child { border: none; font-weight: 700; }
+  .val-pos { color: var(--green); font-weight: 700; }
+  .val-neg { color: var(--red); font-weight: 700; }
+  .highlight-box {
+    background: var(--navy); color: white; border-radius: var(--radius);
+    padding: 16px 18px; display: flex; gap: 30px; margin-bottom: 14px;
+    flex-wrap: wrap;
+  }
+  .hl-item { text-align: center; }
+  .hl-label { font-size: 10px; opacity: 0.7; text-transform: uppercase; letter-spacing: 0.5px; }
+  .hl-val { font-size: 28px; font-weight: 800; color: var(--gold-light); }
+  .hl-sub { font-size: 11px; opacity: 0.8; }
+
+  /* ── ALERT / TOAST ── */
+  .toast {
+    position: fixed; bottom: 24px; right: 24px; z-index: 9999;
+    padding: 12px 20px; border-radius: 8px; font-size: 13px; font-weight: 600;
+    color: white; box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+    transform: translateY(80px); opacity: 0; transition: all 0.3s;
+    max-width: 380px;
+  }
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast.success { background: var(--green); }
+  .toast.error { background: var(--red); }
+  .toast.warning { background: #e67e22; }
+
+  .spinner { display: inline-block; width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 0.7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .empty-state { text-align: center; padding: 60px 20px; color: var(--gray); }
+  .empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+  .empty-state p { font-size: 14px; }
+
+  .alert { padding: 10px 14px; border-radius: 6px; font-size: 13px; margin-bottom: 14px; }
+  .alert-warning { background: #fff3cd; border: 1px solid #ffc107; color: #856404; }
+  .alert-danger { background: #f8d7da; border: 1px solid #f5c2c7; color: #842029; }
+  .alert-success { background: #d1e7dd; border: 1px solid #badbcc; color: #0f5132; }
+  .alert-info { background: #cff4fc; border: 1px solid #b6effb; color: #055160; }
+
+  .divider { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
+  .text-muted { color: var(--gray); font-size: 12px; }
+  .tag { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 600; }
+  .tag-el { background: #dbeafe; color: #1e40af; }
+  .tag-hpl { background: #ede9fe; color: #5b21b6; }
+  .tag-cl { background: #dcfce7; color: #166534; }
+  .tag-rh { background: #fef3c7; color: #92400e; }
+  .tag-mat { background: #fce7f3; color: #831843; }
+  .tag-pat { background: #e0f2fe; color: #075985; }
+  .tag-comp { background: #f0fdf4; color: #14532d; }
+  .tag-scl { background: #fdf2f8; color: #701a75; }
+
+  .readonly-info { display: flex; flex-direction: column; }
+  .readonly-info span:first-child { font-size: 13px; font-weight: 600; color: var(--navy); }
+  .readonly-info span:last-child { font-size: 11px; color: var(--gray); }
+
+  @media(max-width: 600px) {
+    .form-grid { grid-template-columns: 1fr; }
+    .header-title p { display: none; }
+    .content { padding: 12px; }
+    .employees-grid { grid-template-columns: 1fr; }
+  }
+  .hidden { display: none !important; }
+  .loading-overlay {
+    position: fixed; inset: 0; background: rgba(255,255,255,0.85);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    z-index: 9998; gap: 12px;
+  }
+  .loading-spinner { width: 40px; height: 40px; border: 3px solid var(--border); border-top-color: var(--navy); border-radius: 50%; animation: spin 0.8s linear infinite; }
+  .loading-text { font-size: 14px; color: var(--navy); font-weight: 600; }
+  .sync-status { font-size: 11px; color: var(--gray); padding: 4px 10px; background: var(--light-gray); border-radius: 10px; }
+  
+  /* Print styles */
+  @media print {
+    .no-print { display: none !important; }
+    .modal-overlay { position: static; background: none; padding: 0; }
+    .modal { box-shadow: none; max-height: none; }
+    .modal-header { background: var(--navy) !important; -webkit-print-color-adjust: exact; }
+  }
+</style>
+</head>
+<body>
+
+<!-- LOGIN SCREEN -->
+<div id="loginScreen">
+  <div class="login-card">
+    <svg class="emblem-big" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="32" cy="32" r="30" fill="#1a2744" stroke="#c9a84c" stroke-width="2"/>
+      <text x="32" y="38" text-anchor="middle" fill="#c9a84c" font-size="14" font-weight="bold" font-family="Arial">SSC</text>
+    </svg>
+    <h2>SSC (NWR) Leave Manager</h2>
+    <p>Staff Selection Commission · North Western Region</p>
+    <div class="login-tabs">
+      <button class="login-tab active" onclick="setLoginRole('admin')">🔐 Admin</button>
+      <button class="login-tab" onclick="setLoginRole('viewer')">👁️ Viewer</button>
+    </div>
+    <div class="form-group">
+      <label>Username</label>
+      <input class="form-control" id="loginUser" placeholder="Enter username" />
+    </div>
+    <div class="form-group">
+      <label>Password</label>
+      <input class="form-control" id="loginPass" type="password" placeholder="Enter password" onkeydown="if(event.key==='Enter') doLogin()" />
+    </div>
+    <button class="btn-primary" onclick="doLogin()">Login</button>
+    <div class="login-error" id="loginError"></div>
+    <p style="margin-top:16px; font-size:11px; color:#aaa;">Admin: sscnwr / ssc@nwr &nbsp;|&nbsp; Viewer: view / view123</p>
+  </div>
+</div>
+
+<!-- LOADING OVERLAY -->
+<div class="loading-overlay hidden" id="loadingOverlay">
+  <div class="loading-spinner"></div>
+  <div class="loading-text" id="loadingText">Syncing with Google Sheets…</div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- MAIN APP -->
+<div id="app">
+  <div class="header">
+    <div class="header-left">
+      <svg class="emblem" viewBox="0 0 42 42" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="21" cy="21" r="20" fill="#243460" stroke="#c9a84c" stroke-width="1.5"/>
+        <text x="21" y="26" text-anchor="middle" fill="#c9a84c" font-size="10" font-weight="bold" font-family="Arial">SSC</text>
+      </svg>
+      <div class="header-title">
+        <h1>Leave Management System</h1>
+        <p>Staff Selection Commission · North Western Region · Chandigarh</p>
+      </div>
+    </div>
+    <div class="header-right">
+      <span class="sync-status" id="syncStatus">⏳ Not synced</span>
+      <span class="role-badge" id="roleBadge">ADMIN</span>
+      <button class="btn-logout" onclick="logout()">Logout</button>
+    </div>
+  </div>
+
+  <div class="topbar no-print">
+    <button class="btn btn-add" id="addEmpBtn" onclick="openAddEmployee()">+ Add Employee</button>
+    <button class="btn btn-gold" onclick="syncData()">⟳ Sync Sheets</button>
+    <button class="btn btn-outline btn-sm" onclick="openSettings()">⚙ Settings</button>
+    <input class="search-box" id="searchBox" placeholder="🔍 Search employee..." oninput="renderEmployees()" />
+    <span id="empCount" class="text-muted"></span>
+  </div>
+
+  <div class="content">
+    <div class="section-title">All Employees</div>
+    <div class="employees-grid" id="empGrid"></div>
+  </div>
+</div>
+
+<!-- ══════════════ MODALS ══════════════ -->
+
+<!-- ADD/EDIT EMPLOYEE MODAL -->
+<div class="modal-overlay hidden" id="modalEmployee">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="empModalTitle">Add New Employee</h3>
+      <button class="modal-close" onclick="closeModal('modalEmployee')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Full Name <span>*</span></label>
+          <input class="form-control" id="empName" placeholder="e.g. Ramesh Kumar" />
+        </div>
+        <div class="form-group">
+          <label>Gender <span>*</span></label>
+          <select class="form-control" id="empGender" onchange="toggleMatPat()">
+            <option value="">-- Select --</option>
+            <option>Male</option>
+            <option>Female</option>
+            <option>Other</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Cadre <span>*</span></label>
+          <select class="form-control" id="empCadre">
+            <option value="">-- Select --</option>
+            <option>Group A (Gazetted)</option>
+            <option>Group A (Non-Gazetted)</option>
+            <option>Group B (Gazetted)</option>
+            <option>Group B (Non-Gazetted)</option>
+            <option>Group C</option>
+            <option>MTS</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Designation <span>*</span></label>
+          <input class="form-control" id="empDesig" placeholder="e.g. Assistant Section Officer" />
+        </div>
+        <div class="form-group form-full">
+          <label>Leave Balance As On <span>*</span></label>
+          <input class="form-control" type="date" id="empBalDate" />
+        </div>
+      </div>
+
+      <hr class="divider">
+      <div class="leave-section-header">Opening Leave Balance</div>
+      <div style="background:#f8f9ff; border:1px solid var(--border); border-top:none; padding:16px; border-radius:0 0 6px 6px;">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Earned Leave (EL)</label>
+            <input class="form-control" type="number" id="bal_EL" placeholder="0" min="0" max="300" />
+          </div>
+          <div class="form-group">
+            <label>Half Pay Leave (HPL)</label>
+            <input class="form-control" type="number" id="bal_HPL" placeholder="0" min="0" />
+          </div>
+          <div class="form-group">
+            <label>Casual Leave (CL)</label>
+            <input class="form-control" type="number" id="bal_CL" placeholder="0" min="0" max="8" />
+          </div>
+          <div class="form-group">
+            <label>Restricted Holidays (RH)</label>
+            <input class="form-control" type="number" id="bal_RH" placeholder="0" min="0" max="2" />
+          </div>
+          <div class="form-group" id="matRow">
+            <label>Maternity Leave</label>
+            <input class="form-control" type="number" id="bal_MAT" placeholder="0" min="0" />
+          </div>
+          <div class="form-group" id="patRow">
+            <label>Paternity Leave</label>
+            <input class="form-control" type="number" id="bal_PAT" placeholder="0" min="0" />
+          </div>
+          <div class="form-group">
+            <label>Special Casual Leave (SCL)</label>
+            <input class="form-control" type="number" id="bal_SCL" placeholder="0" min="0" />
+          </div>
+          <div class="form-group">
+            <label>Compensatory Leave</label>
+            <input class="form-control" type="number" id="bal_COMP" placeholder="0" min="0" />
+          </div>
+        </div>
+        <div class="form-group form-full">
+          <label>Remarks (optional)</label>
+          <input class="form-control" id="empRemarks" placeholder="Any opening remarks..." />
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modalEmployee')">Cancel</button>
+      <button class="btn btn-add" onclick="saveEmployee()">Save Employee</button>
+    </div>
+  </div>
+</div>
+
+<!-- EMPLOYEE PROFILE MODAL -->
+<div class="modal-overlay hidden" id="modalProfile">
+  <div class="modal modal-lg">
+    <div class="profile-header">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div>
+          <div class="profile-name" id="profileName"></div>
+          <div class="profile-meta" id="profileMeta"></div>
+        </div>
+        <button class="modal-close" onclick="closeModal('modalProfile')">×</button>
+      </div>
+    </div>
+    <div class="profile-tabs no-print">
+      <div class="profile-tab active" onclick="switchTab('leaves')" id="tabLeaves">📋 Leave Ledger</div>
+      <div class="profile-tab" onclick="switchTab('summary')" id="tabSummary">📊 Summary</div>
+      <div class="profile-tab" onclick="switchTab('edit')" id="tabEdit">✏️ Edit Profile</div>
+    </div>
+    <div class="modal-body">
+
+      <!-- LEAVE LEDGER TAB -->
+      <div id="tabContentLeaves">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;" class="no-print">
+          <span class="section-title" style="margin:0">Leave Entries</span>
+          <button class="btn btn-add btn-sm" id="addLeaveBtn" onclick="openLeaveEntry()">+ Add Leave Entry</button>
+        </div>
+        <div id="leaveEntriesList"></div>
+      </div>
+
+      <!-- SUMMARY TAB -->
+      <div id="tabContentSummary" class="hidden">
+        <div style="margin-bottom:14px;" class="no-print">
+          <label style="font-size:12px;font-weight:600;color:var(--navy);display:block;margin-bottom:4px;">Generate Summary As On</label>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+            <input class="form-control" type="date" id="summaryDate" style="width:180px" />
+            <button class="btn btn-gold btn-sm" onclick="generateSummary()">Generate Summary</button>
+            <button class="btn btn-outline btn-sm" onclick="window.print()">🖨 Print</button>
+          </div>
+        </div>
+        <div id="summaryContent"></div>
+      </div>
+
+      <!-- EDIT PROFILE TAB -->
+      <div id="tabContentEdit" class="hidden">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Full Name</label>
+            <input class="form-control" id="editName" />
+          </div>
+          <div class="form-group">
+            <label>Gender</label>
+            <select class="form-control" id="editGender">
+              <option>Male</option><option>Female</option><option>Other</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Cadre</label>
+            <select class="form-control" id="editCadre">
+              <option>Group A (Gazetted)</option><option>Group A (Non-Gazetted)</option>
+              <option>Group B (Gazetted)</option><option>Group B (Non-Gazetted)</option>
+              <option>Group C</option><option>MTS</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Designation</label>
+            <input class="form-control" id="editDesig" />
+          </div>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:10px;" class="no-print">
+          <button class="btn btn-add" onclick="saveEditProfile()">Save Changes</button>
+          <button class="btn btn-danger" onclick="deleteEmployee()">Delete Employee</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- LEAVE ENTRY MODAL -->
+<div class="modal-overlay hidden" id="modalLeaveEntry">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="leaveEntryTitle">Add Leave Entry</h3>
+      <button class="modal-close" onclick="closeModal('modalLeaveEntry')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Leave Type <span>*</span></label>
+          <select class="form-control" id="leaveType" onchange="toggleCompOff()">
+            <option value="">-- Select --</option>
+            <option value="EL">Earned Leave (EL)</option>
+            <option value="HPL">Half Pay Leave (HPL)</option>
+            <option value="CL">Casual Leave (CL)</option>
+            <option value="RH">Restricted Holiday (RH)</option>
+            <option value="MAT">Maternity Leave</option>
+            <option value="PAT">Paternity Leave</option>
+            <option value="SCL">Special Casual Leave (SCL)</option>
+            <option value="COMP">Compensatory Leave</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Number of Days <span>*</span></label>
+          <input class="form-control" type="number" id="leaveDays" placeholder="e.g. 3" min="0.5" step="0.5" oninput="checkLeaveConsistency()" />
+        </div>
+        <div class="form-group">
+          <label>From Date <span>*</span></label>
+          <input class="form-control" type="date" id="leaveFrom" oninput="checkLeaveConsistency()" />
+        </div>
+        <div class="form-group">
+          <label>To Date <span>*</span></label>
+          <input class="form-control" type="date" id="leaveTo" oninput="checkLeaveConsistency()" />
+        </div>
+        <div class="form-group form-full hidden" id="compOffRow">
+          <label>Compensatory Off Granted Against (Date of Extra Work) <span>*</span></label>
+          <input class="form-control" type="date" id="compOffDate" oninput="checkCompOff()" />
+          <div class="alert alert-warning hidden" id="compOffWarning" style="margin-top:6px;padding:6px 10px;font-size:12px;"></div>
+        </div>
+        <div class="form-group form-full">
+          <label>Remarks</label>
+          <input class="form-control" id="leaveRemarks" placeholder="Optional notes, order no., etc." />
+        </div>
+      </div>
+      <div class="alert hidden" id="leaveConsistencyAlert" style="margin-top:4px;"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modalLeaveEntry')">Cancel</button>
+      <button class="btn btn-add" id="saveLeaveBtn" onclick="saveLeaveEntry()">Save Entry</button>
+    </div>
+  </div>
+</div>
+
+<!-- SETTINGS MODAL -->
+<div class="modal-overlay hidden" id="modalSettings">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>⚙ Settings</h3>
+      <button class="modal-close" onclick="closeModal('modalSettings')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Google Apps Script URL</label>
+        <input class="form-control" id="settingsURL" placeholder="Paste your deployed Apps Script URL here" />
+        <p class="text-muted" style="margin-top:4px;">Deploy the Apps Script code as a Web App and paste the URL above.</p>
+      </div>
+      <div class="form-group">
+        <label>Admin Username</label>
+        <input class="form-control" id="settingsAdminUser" value="sscnwr" />
+      </div>
+      <div class="form-group">
+        <label>Admin Password</label>
+        <input class="form-control" type="password" id="settingsAdminPass" placeholder="Change admin password" />
+      </div>
+      <div class="form-group">
+        <label>Viewer Username</label>
+        <input class="form-control" id="settingsViewerUser" value="view" />
+      </div>
+      <div class="form-group">
+        <label>Viewer Password</label>
+        <input class="form-control" type="password" id="settingsViewerPass" placeholder="Change viewer password" />
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modalSettings')">Cancel</button>
+      <button class="btn btn-add" onclick="saveSettings()">Save Settings</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════
+// CONFIG & STATE
+// ════════════════════════════════════════════════════
+const DEFAULT_SETTINGS = {
+  adminUser: 'sscnwr',
+  adminPass: 'ssc@nwr',
+  viewerUser: 'view',
+  viewerPass: 'view123',
+  scriptURL: ''
+};
+
+let settings = JSON.parse(localStorage.getItem('ssc_settings') || 'null') || {...DEFAULT_SETTINGS};
+let employees = JSON.parse(localStorage.getItem('ssc_employees') || '[]');
+let currentUser = null;
+let isAdmin = false;
+let editingEmpId = null;
+let editingLeaveId = null;
+let activeProfileEmpId = null;
+
+// ════════════════════════════════════════════════════
+// UTILITIES
+// ════════════════════════════════════════════════════
+function uid() { return Date.now().toString(36) + Math.random().toString(36).substr(2,5); }
+function today() { return new Date().toISOString().split('T')[0]; }
+function fmtDate(d) {
+  if (!d) return '—';
+  const dt = new Date(d + 'T00:00:00');
+  return dt.toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' });
+}
+function daysBetween(d1, d2) {
+  const t1 = new Date(d1 + 'T00:00:00'), t2 = new Date(d2 + 'T00:00:00');
+  return Math.round((t2 - t1) / 86400000) + 1;
+}
+function save() {
+  localStorage.setItem('ssc_employees', JSON.stringify(employees));
+  localStorage.setItem('ssc_settings', JSON.stringify(settings));
+}
+function showToast(msg, type='success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = `toast ${type} show`;
+  setTimeout(() => t.className = 'toast', 3500);
+}
+function showLoading(txt='Syncing…') {
+  document.getElementById('loadingOverlay').classList.remove('hidden');
+  document.getElementById('loadingText').textContent = txt;
+}
+function hideLoading() { document.getElementById('loadingOverlay').classList.add('hidden'); }
+function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
+
+const LEAVE_LABELS = {
+  EL:'Earned Leave (EL)', HPL:'Half Pay Leave (HPL)', CL:'Casual Leave (CL)',
+  RH:'Restricted Holiday (RH)', MAT:'Maternity Leave', PAT:'Paternity Leave',
+  SCL:'Special Casual Leave (SCL)', COMP:'Compensatory Leave'
+};
+const LEAVE_TAG = {
+  EL:'tag-el', HPL:'tag-hpl', CL:'tag-cl', RH:'tag-rh',
+  MAT:'tag-mat', PAT:'tag-pat', SCL:'tag-scl', COMP:'tag-comp'
+};
+
+// ════════════════════════════════════════════════════
+// AUTH
+// ════════════════════════════════════════════════════
+let loginRole = 'admin';
+function setLoginRole(role) {
+  loginRole = role;
+  document.querySelectorAll('.login-tab').forEach((t,i) => t.classList.toggle('active', (i===0&&role==='admin')||(i===1&&role==='viewer')));
+}
+function doLogin() {
+  const u = document.getElementById('loginUser').value.trim();
+  const p = document.getElementById('loginPass').value;
+  document.getElementById('loginError').textContent = '';
+  if (loginRole === 'admin') {
+    if (u === settings.adminUser && p === settings.adminPass) {
+      currentUser = u; isAdmin = true; enterApp();
+    } else { document.getElementById('loginError').textContent = '❌ Invalid admin credentials.'; }
+  } else {
+    if (u === settings.viewerUser && p === settings.viewerPass) {
+      currentUser = u; isAdmin = false; enterApp();
+    } else { document.getElementById('loginError').textContent = '❌ Invalid viewer credentials.'; }
+  }
+}
+function enterApp() {
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  document.getElementById('roleBadge').textContent = isAdmin ? 'ADMIN' : 'VIEWER';
+  document.getElementById('addEmpBtn').style.display = isAdmin ? '' : 'none';
+  document.getElementById('addLeaveBtn') && (document.getElementById('addLeaveBtn').style.display = isAdmin ? '' : 'none');
+  renderEmployees();
+  if (settings.scriptURL) syncData();
+}
+function logout() {
+  currentUser = null; isAdmin = false;
+  document.getElementById('loginScreen').style.display = '';
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('loginUser').value = '';
+  document.getElementById('loginPass').value = '';
+}
+
+// ════════════════════════════════════════════════════
+// LEAVE CREDIT ENGINE
+// ════════════════════════════════════════════════════
+function applyCredits(emp, uptoDate) {
+  // Returns computed balances up to a given date, processing all credits and debits
+  const asOn = new Date(emp.balDate + 'T00:00:00');
+  const upto = new Date(uptoDate + 'T00:00:00');
+
+  let bal = {
+    EL: Number(emp.balances.EL || 0),
+    HPL: Number(emp.balances.HPL || 0),
+    CL: Number(emp.balances.CL || 0),
+    RH: Number(emp.balances.RH || 0),
+    MAT: Number(emp.balances.MAT || 0),
+    PAT: Number(emp.balances.PAT || 0),
+    SCL: Number(emp.balances.SCL || 0),
+    COMP: Number(emp.balances.COMP || 0)
+  };
+
+  // Generate credit events between asOn and upto
+  const credits = [];
+  for (let y = asOn.getFullYear(); y <= upto.getFullYear() + 1; y++) {
+    ['01-01','07-01'].forEach(md => {
+      const cd = new Date(`${y}-${md}T00:00:00`);
+      if (cd > asOn && cd <= upto) {
+        credits.push({ date: cd, type: md === '01-01' ? 'ANNUAL' : 'HALF' });
+      }
+    });
+  }
+  credits.sort((a,b) => a.date - b.date);
+
+  // Collect leave entries sorted by date
+  const entries = [...(emp.leaves || [])].sort((a,b) => new Date(a.fromDate) - new Date(b.fromDate));
+
+  // Process chronologically
+  let eventIdx = 0, creditIdx = 0;
+  const allEvents = [];
+  credits.forEach(c => allEvents.push({ ...c, kind: 'credit' }));
+  entries.forEach(e => {
+    const ed = new Date(e.fromDate + 'T00:00:00');
+    if (ed > asOn && ed <= upto) allEvents.push({ date: ed, kind: 'leave', entry: e });
+  });
+  allEvents.sort((a,b) => a.date - b.date);
+
+  for (const ev of allEvents) {
+    if (ev.kind === 'credit') {
+      if (ev.type === 'ANNUAL') {
+        // 1st Jan: credit EL+15, HPL+10, CL=8 (reset), RH=2 (reset)
+        bal.EL = Math.min(300, bal.EL + 15);
+        bal.HPL += 10;
+        bal.CL = 8;   // reset; old balance expires
+        bal.RH = 2;   // reset
+      } else {
+        // 1st July: credit EL+15, HPL+10
+        const elBefore = bal.EL;
+        bal.EL = Math.min(300, bal.EL + 15);
+        bal.HPL += 10;
+        // End of June carry-forward cap: EL cannot exceed 300
+        // (already handled by Math.min above)
+      }
+    } else {
+      // Deduct leave
+      const e = ev.entry;
+      const d = Number(e.days);
+      if (bal[e.type] !== undefined) {
+        bal[e.type] = Math.max(0, bal[e.type] - d);
+      }
+    }
+  }
+
+  // EL cap: cannot exceed 300
+  bal.EL = Math.min(300, bal.EL);
+
+  return bal;
+}
+
+// ════════════════════════════════════════════════════
+// EMPLOYEE CRUD
+// ════════════════════════════════════════════════════
+function toggleMatPat() {
+  const g = document.getElementById('empGender').value;
+  document.getElementById('matRow').style.display = g === 'Female' ? '' : 'none';
+  document.getElementById('patRow').style.display = (g === 'Male' || g === 'Other') ? '' : 'none';
+}
+
+function openAddEmployee() {
+  if (!isAdmin) return;
+  editingEmpId = null;
+  document.getElementById('empModalTitle').textContent = 'Add New Employee';
+  ['empName','empDesig','empRemarks'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('empGender').value = '';
+  document.getElementById('empCadre').value = '';
+  document.getElementById('empBalDate').value = today();
+  ['EL','HPL','CL','RH','MAT','PAT','SCL','COMP'].forEach(k => {
+    const el = document.getElementById('bal_'+k);
+    if (el) el.value = '';
+  });
+  toggleMatPat();
+  openModal('modalEmployee');
+}
+
+function saveEmployee() {
+  if (!isAdmin) return;
+  const name = document.getElementById('empName').value.trim();
+  const gender = document.getElementById('empGender').value;
+  const cadre = document.getElementById('empCadre').value;
+  const desig = document.getElementById('empDesig').value.trim();
+  const balDate = document.getElementById('empBalDate').value;
+  if (!name || !gender || !cadre || !desig || !balDate) {
+    showToast('Please fill all required fields.', 'error'); return;
+  }
+  const balances = {};
+  ['EL','HPL','CL','RH','MAT','PAT','SCL','COMP'].forEach(k => {
+    const el = document.getElementById('bal_'+k);
+    balances[k] = el ? (parseFloat(el.value) || 0) : 0;
+  });
+  if (balances.EL > 300) { showToast('EL cannot exceed 300.', 'error'); return; }
+
+  const remarks = document.getElementById('empRemarks').value.trim();
+
+  if (editingEmpId) {
+    const emp = employees.find(e => e.id === editingEmpId);
+    if (emp) { emp.name = name; emp.gender = gender; emp.cadre = cadre; emp.designation = desig; emp.balDate = balDate; emp.balances = balances; emp.remarks = remarks; }
+  } else {
+    employees.push({ id: uid(), name, gender, cadre, designation: desig, balDate, balances, remarks, leaves: [] });
+  }
+  save(); renderEmployees(); closeModal('modalEmployee');
+  showToast(editingEmpId ? 'Employee updated.' : 'Employee added successfully.', 'success');
+  autoSync();
+}
+
+function deleteEmployee() {
+  if (!isAdmin) return;
+  if (!confirm(`Delete ${employees.find(e=>e.id===activeProfileEmpId)?.name}? This cannot be undone.`)) return;
+  employees = employees.filter(e => e.id !== activeProfileEmpId);
+  save(); renderEmployees(); closeModal('modalProfile');
+  showToast('Employee deleted.', 'warning');
+  autoSync();
+}
+
+function saveEditProfile() {
+  if (!isAdmin) return;
+  const emp = employees.find(e => e.id === activeProfileEmpId);
+  if (!emp) return;
+  emp.name = document.getElementById('editName').value.trim();
+  emp.gender = document.getElementById('editGender').value;
+  emp.cadre = document.getElementById('editCadre').value;
+  emp.designation = document.getElementById('editDesig').value.trim();
+  save(); renderEmployees();
+  // Update profile header
+  document.getElementById('profileName').textContent = emp.name;
+  document.getElementById('profileMeta').textContent = `${emp.designation} · ${emp.cadre} · ${emp.gender}`;
+  showToast('Profile updated.', 'success');
+  autoSync();
+}
+
+// ════════════════════════════════════════════════════
+// RENDER EMPLOYEES
+// ════════════════════════════════════════════════════
+function renderEmployees() {
+  const q = document.getElementById('searchBox').value.toLowerCase();
+  const grid = document.getElementById('empGrid');
+  const filtered = employees.filter(e =>
+    e.name.toLowerCase().includes(q) ||
+    e.designation.toLowerCase().includes(q) ||
+    e.cadre.toLowerCase().includes(q)
+  );
+  document.getElementById('empCount').textContent = `${filtered.length} employee${filtered.length!==1?'s':''}`;
+
+  if (!employees.length) {
+    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><div class="icon">👤</div><p>No employees added yet.<br>Click "Add Employee" to get started.</p></div>`;
+    return;
+  }
+  if (!filtered.length) {
+    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><div class="icon">🔍</div><p>No employees match your search.</p></div>`;
+    return;
+  }
+
+  grid.innerHTML = filtered.map(emp => {
+    const bal = applyCredits(emp, today());
+    return `
+    <div class="emp-card" onclick="openProfile('${emp.id}')">
+      <div class="emp-card-header">
+        <div>
+          <div class="emp-name">${emp.name}</div>
+          <div class="emp-desig">${emp.designation} · ${emp.cadre}</div>
+        </div>
+        <span class="gender-badge">${emp.gender.charAt(0)}</span>
+      </div>
+      <div class="leave-chips">
+        <span class="chip el">EL: ${bal.EL}</span>
+        <span class="chip hpl">HPL: ${bal.HPL}</span>
+        <span class="chip cl">CL: ${bal.CL}</span>
+        <span class="chip">RH: ${bal.RH}</span>
+        <span class="chip">COMP: ${bal.COMP}</span>
+      </div>
+      <div class="emp-card-actions no-print">
+        <button class="btn btn-gold btn-sm" onclick="event.stopPropagation();openProfile('${emp.id}')">View Profile</button>
+        ${isAdmin ? `<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();openSummaryQuick('${emp.id}')">Summary</button>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ════════════════════════════════════════════════════
+// PROFILE
+// ════════════════════════════════════════════════════
+function openProfile(id) {
+  activeProfileEmpId = id;
+  const emp = employees.find(e => e.id === id);
+  document.getElementById('profileName').textContent = emp.name;
+  document.getElementById('profileMeta').textContent = `${emp.designation} · ${emp.cadre} · ${emp.gender}`;
+  // populate edit tab
+  document.getElementById('editName').value = emp.name;
+  document.getElementById('editGender').value = emp.gender;
+  document.getElementById('editCadre').value = emp.cadre;
+  document.getElementById('editDesig').value = emp.designation;
+  // hide edit controls for viewer
+  document.querySelectorAll('#modalProfile .no-print .btn-add, #modalProfile .no-print .btn-danger').forEach(b => b.style.display = isAdmin ? '' : 'none');
+  document.getElementById('addLeaveBtn').style.display = isAdmin ? '' : 'none';
+  // show leaves tab
+  switchTab('leaves');
+  openModal('modalProfile');
+}
+
+function switchTab(tab) {
+  ['leaves','summary','edit'].forEach(t => {
+    document.getElementById('tabContent'+t.charAt(0).toUpperCase()+t.slice(1)).classList.add('hidden');
+    document.getElementById('tab'+t.charAt(0).toUpperCase()+t.slice(1)).classList.remove('active');
+  });
+  document.getElementById('tabContent'+tab.charAt(0).toUpperCase()+tab.slice(1)).classList.remove('hidden');
+  document.getElementById('tab'+tab.charAt(0).toUpperCase()+tab.slice(1)).classList.add('active');
+  if (tab === 'leaves') renderLeaveEntries();
+  if (tab === 'summary') { document.getElementById('summaryDate').value = today(); document.getElementById('summaryContent').innerHTML = ''; }
+}
+
+// ════════════════════════════════════════════════════
+// LEAVE ENTRIES
+// ════════════════════════════════════════════════════
+function renderLeaveEntries() {
+  const emp = employees.find(e => e.id === activeProfileEmpId);
+  const leaves = [...(emp.leaves || [])].sort((a,b) => new Date(b.fromDate) - new Date(a.fromDate));
+  const el = document.getElementById('leaveEntriesList');
+
+  if (!leaves.length) {
+    el.innerHTML = `<div class="empty-state"><div class="icon">📋</div><p>No leave entries yet.</p></div>`;
+    return;
+  }
+
+  el.innerHTML = `
+    <table class="leave-table">
+      <thead>
+        <tr>
+          <th>Type</th><th>From</th><th>To</th><th>Days</th><th>Remarks</th>${isAdmin?'<th>Action</th>':''}
+        </tr>
+      </thead>
+      <tbody>
+        ${leaves.map(l => `
+        <tr>
+          <td><span class="tag ${LEAVE_TAG[l.type]||''}">${LEAVE_LABELS[l.type]||l.type}</span>
+            ${l.type==='COMP'&&l.compOffDate ? `<br><span class="text-muted">Against: ${fmtDate(l.compOffDate)}</span>` : ''}
+          </td>
+          <td>${fmtDate(l.fromDate)}</td>
+          <td>${fmtDate(l.toDate)}</td>
+          <td><strong>${l.days}</strong></td>
+          <td class="text-muted">${l.remarks||'—'}</td>
+          ${isAdmin ? `<td><button class="btn btn-sm btn-outline" onclick="editLeave('${l.id}')">Edit</button></td>` : ''}
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
+}
+
+function toggleCompOff() {
+  const t = document.getElementById('leaveType').value;
+  document.getElementById('compOffRow').classList.toggle('hidden', t !== 'COMP');
+}
+
+function checkLeaveConsistency() {
+  const f = document.getElementById('leaveFrom').value;
+  const t = document.getElementById('leaveTo').value;
+  const d = parseFloat(document.getElementById('leaveDays').value);
+  const alert = document.getElementById('leaveConsistencyAlert');
+  if (!f || !t || !d) { alert.className = 'alert hidden'; return; }
+  if (new Date(t) < new Date(f)) {
+    alert.className = 'alert alert-danger';
+    alert.textContent = '⚠ To Date cannot be before From Date.'; return;
+  }
+  const calc = daysBetween(f, t);
+  if (Math.abs(calc - d) > 0.1) {
+    alert.className = 'alert alert-warning';
+    alert.textContent = `⚠ Discrepancy: ${f} to ${t} = ${calc} day(s), but you entered ${d}. Please verify.`;
+  } else {
+    alert.className = 'alert alert-success';
+    alert.textContent = `✓ Consistent: ${calc} day(s) from ${fmtDate(f)} to ${fmtDate(t)}.`;
+  }
+}
+
+function checkCompOff() {
+  const leaveFrom = document.getElementById('leaveFrom').value;
+  const compDate = document.getElementById('compOffDate').value;
+  const warn = document.getElementById('compOffWarning');
+  if (!leaveFrom || !compDate) { warn.classList.add('hidden'); return; }
+  const diff = Math.abs(daysBetween(compDate, leaveFrom));
+  if (diff > 30) {
+    warn.classList.remove('hidden');
+    warn.textContent = `⚠ Note: The leave date (${fmtDate(leaveFrom)}) and the date of extra work (${fmtDate(compDate)}) are ${diff} days apart (more than 1 month). Please verify.`;
+  } else {
+    warn.classList.add('hidden');
+  }
+}
+
+function openLeaveEntry(existingId = null) {
+  if (!isAdmin) return;
+  editingLeaveId = existingId;
+  document.getElementById('leaveEntryTitle').textContent = existingId ? 'Edit Leave Entry' : 'Add Leave Entry';
+  document.getElementById('leaveConsistencyAlert').className = 'alert hidden';
+  document.getElementById('compOffWarning').classList.add('hidden');
+
+  if (existingId) {
+    const emp = employees.find(e => e.id === activeProfileEmpId);
+    const l = emp.leaves.find(x => x.id === existingId);
+    document.getElementById('leaveType').value = l.type;
+    document.getElementById('leaveDays').value = l.days;
+    document.getElementById('leaveFrom').value = l.fromDate;
+    document.getElementById('leaveTo').value = l.toDate;
+    document.getElementById('leaveRemarks').value = l.remarks || '';
+    document.getElementById('compOffDate').value = l.compOffDate || '';
+    toggleCompOff();
+  } else {
+    document.getElementById('leaveType').value = '';
+    document.getElementById('leaveDays').value = '';
+    document.getElementById('leaveFrom').value = '';
+    document.getElementById('leaveTo').value = '';
+    document.getElementById('leaveRemarks').value = '';
+    document.getElementById('compOffDate').value = '';
+    document.getElementById('compOffRow').classList.add('hidden');
+  }
+  openModal('modalLeaveEntry');
+}
+
+function editLeave(id) { openLeaveEntry(id); }
+
+function saveLeaveEntry() {
+  if (!isAdmin) return;
+  const type = document.getElementById('leaveType').value;
+  const days = parseFloat(document.getElementById('leaveDays').value);
+  const fromDate = document.getElementById('leaveFrom').value;
+  const toDate = document.getElementById('leaveTo').value;
+  const remarks = document.getElementById('leaveRemarks').value.trim();
+  const compOffDate = document.getElementById('compOffDate').value;
+
+  if (!type || !days || !fromDate || !toDate) {
+    showToast('Please fill all required fields.', 'error'); return;
+  }
+  if (new Date(toDate) < new Date(fromDate)) {
+    showToast('To Date cannot be before From Date.', 'error'); return;
+  }
+  const calc = daysBetween(fromDate, toDate);
+  if (Math.abs(calc - days) > 0.1) {
+    if (!confirm(`Discrepancy detected: date range gives ${calc} day(s) but you entered ${days}. Save anyway?`)) return;
+  }
+  if (type === 'COMP' && !compOffDate) {
+    showToast('Please enter the date of extra work for Compensatory Leave.', 'error'); return;
+  }
+
+  const emp = employees.find(e => e.id === activeProfileEmpId);
+  const entry = { id: editingLeaveId || uid(), type, days, fromDate, toDate, remarks, compOffDate: compOffDate || null };
+
+  if (editingLeaveId) {
+    const idx = emp.leaves.findIndex(x => x.id === editingLeaveId);
+    if (idx !== -1) emp.leaves[idx] = entry;
+  } else {
+    emp.leaves.push(entry);
+  }
+
+  save(); renderLeaveEntries(); closeModal('modalLeaveEntry');
+  showToast(editingLeaveId ? 'Leave entry updated.' : 'Leave entry added.', 'success');
+  renderEmployees();
+  autoSync();
+}
+
+// ════════════════════════════════════════════════════
+// SUMMARY
+// ════════════════════════════════════════════════════
+function openSummaryQuick(id) {
+  openProfile(id);
+  setTimeout(() => switchTab('summary'), 100);
+}
+
+function generateSummary() {
+  const upto = document.getElementById('summaryDate').value;
+  if (!upto) { showToast('Please select a summary date.', 'error'); return; }
+  const emp = employees.find(e => e.id === activeProfileEmpId);
+  const bal = applyCredits(emp, upto);
+
+  // Calculate total credited and availed in period
+  const leaves = (emp.leaves || []).filter(l => l.fromDate >= emp.balDate && l.fromDate <= upto);
+  const availed = {};
+  ['EL','HPL','CL','RH','MAT','PAT','SCL','COMP'].forEach(k => {
+    availed[k] = leaves.filter(l => l.type === k).reduce((s,l) => s + Number(l.days), 0);
+  });
+
+  const summaryDate = fmtDate(upto);
+  const asOnStr = upto === today() ? 'today' : summaryDate;
+
+  document.getElementById('summaryContent').innerHTML = `
+    <div style="text-align:center;margin-bottom:16px;" class="print-header">
+      <div style="font-weight:700;font-size:16px;color:var(--navy)">LEAVE BALANCE STATEMENT</div>
+      <div style="font-size:13px;color:var(--gray)">Staff Selection Commission (NWR), Chandigarh</div>
+      <div style="font-size:12px;margin-top:4px;color:var(--gray)">As on: <strong>${summaryDate}</strong></div>
+    </div>
+
+    <div class="summary-box" style="border-top:3px solid var(--gold)">
+      <h4>Employee Details</h4>
+      <div class="summary-row"><span>Name</span><span><strong>${emp.name}</strong></span></div>
+      <div class="summary-row"><span>Designation</span><span>${emp.designation}</span></div>
+      <div class="summary-row"><span>Cadre</span><span>${emp.cadre}</span></div>
+      <div class="summary-row"><span>Gender</span><span>${emp.gender}</span></div>
+      <div class="summary-row"><span>Opening Balance Date</span><span>${fmtDate(emp.balDate)}</span></div>
+    </div>
+
+    <div class="highlight-box">
+      <div class="hl-item">
+        <div class="hl-label">Earned Leave</div>
+        <div class="hl-val">${bal.EL}</div>
+        <div class="hl-sub">Balance as on ${summaryDate}</div>
+      </div>
+      <div class="hl-item">
+        <div class="hl-label">Half Pay Leave</div>
+        <div class="hl-val">${bal.HPL}</div>
+        <div class="hl-sub">Balance as on ${summaryDate}</div>
+      </div>
+      <div class="hl-item">
+        <div class="hl-label">Casual Leave</div>
+        <div class="hl-val">${bal.CL}</div>
+        <div class="hl-sub">Balance as on ${summaryDate}</div>
+      </div>
+    </div>
+
+    <div class="summary-box">
+      <h4>📊 Earned Leave (EL) Detail — Primary Focus</h4>
+      <div class="summary-row"><span>Opening EL Balance</span><span>${emp.balances.EL || 0}</span></div>
+      <div class="summary-row"><span>EL Credited (auto)</span><span class="val-pos">+${computeCredited(emp, upto, 'EL')}</span></div>
+      <div class="summary-row"><span>EL Availed</span><span class="val-neg">−${availed.EL}</span></div>
+      <div class="summary-row"><span>EL Cap Adjustment (300 limit)</span><span>Applied</span></div>
+      <div class="summary-row" style="border-top:2px solid var(--border);padding-top:6px;"><span>EL Balance as on ${summaryDate}</span><span><strong>${bal.EL}</strong></span></div>
+    </div>
+
+    <div class="summary-box">
+      <h4>📊 Half Pay Leave (HPL) Detail</h4>
+      <div class="summary-row"><span>Opening HPL Balance</span><span>${emp.balances.HPL || 0}</span></div>
+      <div class="summary-row"><span>HPL Credited (auto)</span><span class="val-pos">+${computeCredited(emp, upto, 'HPL')}</span></div>
+      <div class="summary-row"><span>HPL Availed</span><span class="val-neg">−${availed.HPL}</span></div>
+      <div class="summary-row" style="border-top:2px solid var(--border);padding-top:6px;"><span>HPL Balance as on ${summaryDate}</span><span><strong>${bal.HPL}</strong></span></div>
+    </div>
+
+    <div class="summary-box">
+      <h4>Other Leaves</h4>
+      ${['CL','RH','MAT','PAT','SCL','COMP'].map(k => `
+      <div class="summary-row">
+        <span><span class="tag ${LEAVE_TAG[k]}">${LEAVE_LABELS[k]}</span></span>
+        <span>Balance: <strong>${bal[k]}</strong> &nbsp;|&nbsp; Availed: ${availed[k]}</span>
+      </div>`).join('')}
+      <div class="alert alert-warning" style="margin-top:10px;font-size:12px;">
+        ⚠ CL and RH balances lapse on 31st December every year. Shown balance is valid only within the current year.
+      </div>
+    </div>
+
+    ${leaves.length ? `
+    <div class="summary-box">
+      <h4>Leave Entries in Period (${fmtDate(emp.balDate)} to ${summaryDate})</h4>
+      <table class="leave-table">
+        <thead><tr><th>Type</th><th>From</th><th>To</th><th>Days</th><th>Remarks</th></tr></thead>
+        <tbody>
+          ${leaves.sort((a,b)=>new Date(a.fromDate)-new Date(b.fromDate)).map(l=>`
+          <tr>
+            <td><span class="tag ${LEAVE_TAG[l.type]||''}">${LEAVE_LABELS[l.type]||l.type}</span></td>
+            <td>${fmtDate(l.fromDate)}</td><td>${fmtDate(l.toDate)}</td>
+            <td><strong>${l.days}</strong></td><td class="text-muted">${l.remarks||'—'}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>` : ''}
+
+    <div style="text-align:center;font-size:11px;color:var(--gray);margin-top:16px;">
+      Generated on ${new Date().toLocaleString('en-IN')} · SSC (NWR) Leave Management System
+    </div>`;
+}
+
+function computeCredited(emp, uptoDate, type) {
+  const asOn = new Date(emp.balDate + 'T00:00:00');
+  const upto = new Date(uptoDate + 'T00:00:00');
+  let total = 0;
+  for (let y = asOn.getFullYear(); y <= upto.getFullYear() + 1; y++) {
+    ['01-01','07-01'].forEach(md => {
+      const cd = new Date(`${y}-${md}T00:00:00`);
+      if (cd > asOn && cd <= upto) {
+        if (type === 'EL') total += 15;
+        if (type === 'HPL') total += 10;
+        if (type === 'CL' && md === '01-01') total += 8;
+        if (type === 'RH' && md === '01-01') total += 2;
+      }
+    });
+  }
+  return total;
+}
+
+// ════════════════════════════════════════════════════
+// SETTINGS
+// ════════════════════════════════════════════════════
+function openSettings() {
+  if (!isAdmin) return;
+  document.getElementById('settingsURL').value = settings.scriptURL || '';
+  document.getElementById('settingsAdminUser').value = settings.adminUser;
+  document.getElementById('settingsAdminPass').value = '';
+  document.getElementById('settingsViewerUser').value = settings.viewerUser;
+  document.getElementById('settingsViewerPass').value = '';
+  openModal('modalSettings');
+}
+function saveSettings() {
+  settings.scriptURL = document.getElementById('settingsURL').value.trim();
+  settings.adminUser = document.getElementById('settingsAdminUser').value.trim();
+  settings.viewerUser = document.getElementById('settingsViewerUser').value.trim();
+  const ap = document.getElementById('settingsAdminPass').value;
+  const vp = document.getElementById('settingsViewerPass').value;
+  if (ap) settings.adminPass = ap;
+  if (vp) settings.viewerPass = vp;
+  save(); closeModal('modalSettings');
+  showToast('Settings saved.', 'success');
+}
+
+// ════════════════════════════════════════════════════
+// GOOGLE SHEETS SYNC
+// ════════════════════════════════════════════════════
+async function syncData() {
+  if (!settings.scriptURL) {
+    showToast('No Google Apps Script URL set. Go to Settings.', 'warning'); return;
+  }
+  showLoading('Syncing with Google Sheets…');
+  try {
+    // Push data
+    const res = await fetch(settings.scriptURL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'sync', employees })
+    });
+    document.getElementById('syncStatus').textContent = '✓ Synced ' + new Date().toLocaleTimeString('en-IN');
+    showToast('Data synced with Google Sheets.', 'success');
+  } catch(e) {
+    document.getElementById('syncStatus').textContent = '⚠ Sync failed';
+    showToast('Sync failed. Check your Apps Script URL.', 'error');
+  }
+  hideLoading();
+}
+
+function autoSync() {
+  if (settings.scriptURL) {
+    setTimeout(syncData, 500);
+  }
+}
+
+// ════════════════════════════════════════════════════
+// INIT
+// ════════════════════════════════════════════════════
+document.getElementById('empBalDate').value = today();
+document.getElementById('matRow').style.display = 'none';
+document.getElementById('patRow').style.display = 'none';
+</script>
+</body>
+</html>
