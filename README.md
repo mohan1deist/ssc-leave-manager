@@ -1,0 +1,1 @@
+# ssc-leave-manager
