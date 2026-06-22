@@ -124,6 +124,7 @@ select.inp { appearance: none; background-image: url("data:image/svg+xml,%3Csvg 
 }
 .badge-admin { background: var(--gold); color: var(--ink); }
 .badge-viewer { background: #334155; color: #94a3b8; }
+.badge-editor { background: #065f46; color: #6ee7b7; }
 .sync-pill {
   font-size: 10px; color: rgba(255,255,255,.6);
   background: rgba(255,255,255,.08); padding: 3px 10px; border-radius: 20px;
@@ -419,6 +420,7 @@ select.inp { appearance: none; background-image: url("data:image/svg+xml,%3Csvg 
     </div>
     <div class="login-tabs">
       <button class="login-tab active" onclick="setRole('admin')">🔐 Admin</button>
+      <button class="login-tab" onclick="setRole('editor')">✏️ Editor</button>
       <button class="login-tab" onclick="setRole('viewer')">👁 Viewer</button>
     </div>
     <label class="lbl">Username</label>
@@ -427,7 +429,7 @@ select.inp { appearance: none; background-image: url("data:image/svg+xml,%3Csvg 
     <input class="inp" id="lPass" type="password" placeholder="Enter password" onkeydown="if(event.key==='Enter')doLogin()" />
     <button class="btn-login" onclick="doLogin()">Sign In</button>
     <div class="login-err hidden" id="loginErr"></div>
-    <div class="login-hint">Admin: sscnwr / ssc@nwr &nbsp;·&nbsp; Viewer: view / view123</div>
+    <div class="login-hint">Admin: sscnwr / ssc@nwr &nbsp;·&nbsp; Editor: editor / edit@nwr &nbsp;·&nbsp; Viewer: view / view123</div>
   </div>
 </div>
 
@@ -629,7 +631,7 @@ select.inp { appearance: none; background-image: url("data:image/svg+xml,%3Csvg 
     <div id="tcLeaves">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;" class="no-print">
         <span style="font-size:12px;font-weight:700;color:var(--slate);text-transform:uppercase;letter-spacing:.8px;">Leave Entries</span>
-        <button class="btn btn-primary btn-sm admin-only" id="addLeaveBtn" onclick="openLeaveEntry()">＋ Add Entry</button>
+        <button class="btn btn-primary btn-sm editor-or-admin" id="addLeaveBtn" onclick="openLeaveEntry()">＋ Add Entry</button>
       </div>
       <div id="leaveList"></div>
     </div>
@@ -755,6 +757,8 @@ select.inp { appearance: none; background-image: url("data:image/svg+xml,%3Csvg 
     <div class="grid-2">
       <div class="fg"><label>Admin Username</label><input class="inp" id="sAU" /></div>
       <div class="fg"><label>Admin Password</label><input class="inp" type="password" id="sAP" placeholder="Leave blank to keep current" /></div>
+      <div class="fg"><label>Editor Username</label><input class="inp" id="sEU" /></div>
+      <div class="fg"><label>Editor Password</label><input class="inp" type="password" id="sEP" placeholder="Leave blank to keep current" /></div>
       <div class="fg"><label>Viewer Username</label><input class="inp" id="sVU" /></div>
       <div class="fg"><label>Viewer Password</label><input class="inp" type="password" id="sVP" placeholder="Leave blank to keep current" /></div>
     </div>
@@ -770,11 +774,11 @@ select.inp { appearance: none; background-image: url("data:image/svg+xml,%3Csvg 
 // ══════════════════════════════════════════
 // STATE & CONFIG
 // ══════════════════════════════════════════
-const DEF = { adminUser:'sscnwr', adminPass:'ssc@nwr', viewerUser:'view', viewerPass:'view123', scriptURL:'https://script.google.com/macros/s/AKfycbyrVzmiHu2Ge_WZY2mjcRq5MvgOkBz2UOO-R2P3op7uVU_dKoVXASeMnIpLPrhoMytjGw/exec' };
+const DEF = { adminUser:'sscnwr', adminPass:'ssc@nwr', editorUser:'editor', editorPass:'edit@nwr', viewerUser:'view', viewerPass:'view123', scriptURL:'https://script.google.com/macros/s/AKfycbwprSG8bRAQjCmcT9fbZabYKxDM6tOxPQ9P8cQdHvutJok14potftAkjtSHoSGat2IEnA/exec' };
 let cfg = JSON.parse(localStorage.getItem('ssc_cfg') || 'null') || {...DEF};
-cfg.scriptURL = 'https://script.google.com/macros/s/AKfycbyrVzmiHu2Ge_WZY2mjcRq5MvgOkBz2UOO-R2P3op7uVU_dKoVXASeMnIpLPrhoMytjGw/exec'; // hardcoded — never changes regardless of device/browser
+cfg.scriptURL = 'https://script.google.com/macros/s/AKfycbwprSG8bRAQjCmcT9fbZabYKxDM6tOxPQ9P8cQdHvutJok14potftAkjtSHoSGat2IEnA/exec'; // hardcoded — never changes regardless of device/browser
 let emps = JSON.parse(localStorage.getItem('ssc_emps') || '[]');
-let isAdmin = false, activeId = null, editLeaveId = null;
+let isAdmin = false, isEditor = false, activeId = null, editLeaveId = null;
 
 const LEAVE_LBL = { EL:'Earned Leave (EL)', HPL:'Half Pay Leave (HPL)', CL:'Casual Leave (CL)', RH:'Restricted Holiday (RH)', MAT:'Maternity Leave', PAT:'Paternity Leave', SCL:'Special Casual Leave', COMP:'Compensatory Leave' };
 const LEAVE_TAG = { EL:'t-el', HPL:'t-hpl', CL:'t-cl', RH:'t-rh', MAT:'t-mat', PAT:'t-pat', SCL:'t-scl', COMP:'t-comp' };
@@ -786,7 +790,7 @@ const uid = () => Date.now().toString(36) + Math.random().toString(36).substr(2,
 const todayStr = () => new Date().toISOString().split('T')[0];
 const fmtDate = d => { if(!d)return'—'; const dt=new Date(d+'T00:00:00'); return dt.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}); };
 const daysBetween = (d1,d2) => Math.round((new Date(d2+'T00:00:00')-new Date(d1+'T00:00:00'))/86400000)+1;
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyrVzmiHu2Ge_WZY2mjcRq5MvgOkBz2UOO-R2P3op7uVU_dKoVXASeMnIpLPrhoMytjGw/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwprSG8bRAQjCmcT9fbZabYKxDM6tOxPQ9P8cQdHvutJok14potftAkjtSHoSGat2IEnA/exec';
 const persist = () => {
   cfg.scriptURL = SCRIPT_URL; // always hardcoded, never lost
   localStorage.setItem('ssc_emps',JSON.stringify(emps));
@@ -859,31 +863,44 @@ function creditedCount(emp, upto, type) {
 let loginRole='admin';
 function setRole(r) {
   loginRole=r;
-  document.querySelectorAll('.login-tab').forEach((t,i)=>t.classList.toggle('active',(i===0&&r==='admin')||(i===1&&r==='viewer')));
+  document.querySelectorAll('.login-tab').forEach((t,i)=>t.classList.toggle('active',
+    (i===0&&r==='admin')||(i===1&&r==='editor')||(i===2&&r==='viewer')));
 }
 function doLogin() {
   const u=document.getElementById('lUser').value.trim();
   const p=document.getElementById('lPass').value;
   const err=document.getElementById('loginErr');
   err.classList.add('hidden');
-  if(loginRole==='admin'&&u===cfg.adminUser&&p===cfg.adminPass) { isAdmin=true; enterApp(); }
-  else if(loginRole==='viewer'&&u===cfg.viewerUser&&p===cfg.viewerPass) { isAdmin=false; enterApp(); }
-  else { err.textContent='Invalid credentials. Please try again.'; err.classList.remove('hidden'); }
+  if(loginRole==='admin'&&u===cfg.adminUser&&p===cfg.adminPass) {
+    isAdmin=true; isEditor=false; enterApp();
+  } else if(loginRole==='editor'&&u===cfg.editorUser&&p===cfg.editorPass) {
+    isAdmin=false; isEditor=true; enterApp();
+  } else if(loginRole==='viewer'&&u===cfg.viewerUser&&p===cfg.viewerPass) {
+    isAdmin=false; isEditor=false; enterApp();
+  } else {
+    err.textContent='Invalid credentials. Please try again.'; err.classList.remove('hidden');
+  }
 }
 function enterApp() {
   document.getElementById('loginScreen').style.display='none';
   document.getElementById('app').classList.remove('hidden');
-  document.getElementById('roleBadge').textContent=isAdmin?'Admin':'Viewer';
-  document.getElementById('roleBadge').className='badge-role '+(isAdmin?'badge-admin':'badge-viewer');
+  // Role badge
+  const roleLabel = isAdmin?'Admin':isEditor?'Editor':'Viewer';
+  const roleCls   = isAdmin?'badge-admin':isEditor?'badge-editor':'badge-viewer';
+  document.getElementById('roleBadge').textContent=roleLabel;
+  document.getElementById('roleBadge').className='badge-role '+roleCls;
+  // admin-only: Add Employee, Delete, Edit Profile — hidden for editor & viewer
   document.querySelectorAll('.admin-only').forEach(el=>el.style.display=isAdmin?'':'none');
+  // editor-only: Add Leave Entry button — visible for admin + editor, hidden for viewer
+  document.querySelectorAll('.editor-or-admin').forEach(el=>el.style.display=(isAdmin||isEditor)?'':'none');
   renderEmps();
   if(cfg.scriptURL) {
-    syncData(); // full sync on login
-    startAutoSyncTimer(); // start 5-min background sync
+    syncData();
+    startAutoSyncTimer();
   }
 }
 function logout() {
-  isAdmin=false;
+  isAdmin=false; isEditor=false;
   if(autoSyncTimer) { clearInterval(autoSyncTimer); autoSyncTimer=null; }
   document.getElementById('loginScreen').style.display='';
   document.getElementById('app').classList.add('hidden');
@@ -1110,7 +1127,7 @@ function renderLeaveList() {
       <td>${fmtDate(l.fromDate)}</td><td>${fmtDate(l.toDate)}</td>
       <td><strong>${l.days}</strong></td>
       <td style="color:var(--slate);font-size:12px">${l.remarks||'-'}</td>
-      ${isAdmin?`<td><button class="btn btn-ghost btn-xs" onclick="editLeave('${l.id}')">Edit</button></td>`:''}
+      ${isAdmin?`<td><button class="btn btn-ghost btn-xs" onclick="editLeave('${l.id}')">Edit</button></td>`:isEditor?`<td>—</td>`:''}
     </tr>`).join('')}
   </tbody></table>`;
 }
@@ -1140,7 +1157,7 @@ function checkCompGap() {
 }
 
 function openLeaveEntry(existId=null) {
-  if(!isAdmin)return;
+  if(!isAdmin&&!isEditor)return;
   editLeaveId=existId;
   document.getElementById('leaveModalTitle').textContent=existId?'Edit Leave Entry':'Add Leave Entry';
   document.getElementById('consistAlert').className='hidden';
@@ -1165,7 +1182,7 @@ function openLeaveEntry(existId=null) {
 function editLeave(id){openLeaveEntry(id);}
 
 function saveLeave() {
-  if(!isAdmin)return;
+  if(!isAdmin&&!isEditor)return;
   const type=document.getElementById('lType').value;
   const days=parseFloat(document.getElementById('lDays').value);
   const from=document.getElementById('lFrom').value;
@@ -1275,17 +1292,22 @@ function genSummary(){
 // ══════════════════════════════════════════
 function openSettings(){
   if(!isAdmin)return;
-  document.getElementById('sURL').value=cfg.scriptURL||'';;
   document.getElementById('sAU').value=cfg.adminUser;
+  document.getElementById('sEU').value=cfg.editorUser||'editor';
   document.getElementById('sVU').value=cfg.viewerUser;
-  ['sAP','sVP'].forEach(id=>document.getElementById(id).value='');
+  ['sAP','sEP','sVP'].forEach(id=>document.getElementById(id).value='');
   openModal('modalSettings');
 }
 function saveSettings(){
   cfg.adminUser=document.getElementById('sAU').value.trim();
+  cfg.editorUser=document.getElementById('sEU').value.trim();
   cfg.viewerUser=document.getElementById('sVU').value.trim();
-  const ap=document.getElementById('sAP').value, vp=document.getElementById('sVP').value;
-  if(ap) cfg.adminPass=ap; if(vp) cfg.viewerPass=vp;
+  const ap=document.getElementById('sAP').value;
+  const ep=document.getElementById('sEP').value;
+  const vp=document.getElementById('sVP').value;
+  if(ap) cfg.adminPass=ap;
+  if(ep) cfg.editorPass=ep;
+  if(vp) cfg.viewerPass=vp;
   persist(); closeModal('modalSettings'); toast('Settings saved.','ok');
 }
 
