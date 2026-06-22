@@ -873,10 +873,14 @@ function enterApp() {
   document.getElementById('roleBadge').className='badge-role '+(isAdmin?'badge-admin':'badge-viewer');
   document.querySelectorAll('.admin-only').forEach(el=>el.style.display=isAdmin?'':'none');
   renderEmps();
-  if(cfg.scriptURL) syncData();
+  if(cfg.scriptURL) {
+    syncData(); // full sync on login
+    startAutoSyncTimer(); // start 5-min background sync
+  }
 }
 function logout() {
   isAdmin=false;
+  if(autoSyncTimer) { clearInterval(autoSyncTimer); autoSyncTimer=null; }
   document.getElementById('loginScreen').style.display='';
   document.getElementById('app').classList.add('hidden');
   document.getElementById('lUser').value='';
@@ -1283,22 +1287,94 @@ function saveSettings(){
 }
 
 // ══════════════════════════════════════════
-// GOOGLE SHEETS SYNC
+// GOOGLE SHEETS SYNC — BIDIRECTIONAL
+// Push local → Sheets, Pull Sheets → local
+// Auto-sync every 5 minutes
 // ══════════════════════════════════════════
-async function syncData(){
-  if(!cfg.scriptURL){toast('No Apps Script URL. Go to ⚙ Settings.','wrn');return;}
-  showLoad('Syncing with Google Sheets…');
-  try {
-    await fetch(cfg.scriptURL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'sync',employees:emps})});
-    document.getElementById('syncPill').textContent='✓ Synced '+ new Date().toLocaleTimeString('en-IN');
-    toast('Synced with Google Sheets.','ok');
-  } catch(e) {
-    document.getElementById('syncPill').textContent='⚠ Sync failed';
-    toast('Sync failed. Check your Apps Script URL.','err');
+
+let isSyncing = false;
+let autoSyncTimer = null;
+
+async function syncData(silent=false) {
+  if(!cfg.scriptURL){
+    if(!silent) toast('No Apps Script URL. Go to ⚙ Settings.','wrn');
+    return;
   }
-  hideLoad();
+  if(isSyncing) return;
+  isSyncing = true;
+  const pill = document.getElementById('syncPill');
+  pill.textContent = '⟳ Syncing…';
+  if(!silent) showLoad('Syncing with Google Sheets…');
+
+  try {
+    // ── STEP 1: PUSH local data to Sheets ──
+    await fetch(cfg.scriptURL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({action:'sync', employees:emps})
+    });
+
+    // ── STEP 2: PULL latest data from Sheets ──
+    // We use a script URL with ?action=get to fetch JSON back
+    const res = await fetch(cfg.scriptURL + '?action=get', {
+      method: 'GET',
+      mode: 'cors'
+    });
+
+    if(res.ok) {
+      const data = await res.json();
+      if(data.status === 'ok' && Array.isArray(data.employees) && data.employees.length >= emps.length) {
+        // Only overwrite if server has equal or more data (prevents empty wipe)
+        emps = data.employees;
+        persist();
+        renderEmps();
+        // If a profile is open, refresh it
+        if(activeId && !document.getElementById('modalProfile').classList.contains('hidden')) {
+          const stillExists = emps.find(e => e.id === activeId);
+          if(stillExists) renderLeaveList();
+        }
+      }
+    }
+
+    pill.textContent = '✓ ' + new Date().toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit'});
+    if(!silent) toast('Synced successfully.', 'ok');
+
+  } catch(e) {
+    pill.textContent = '⚠ Sync failed';
+    if(!silent) toast('Sync failed. Check Apps Script URL.', 'err');
+  }
+
+  isSyncing = false;
+  if(!silent) hideLoad();
 }
-function autoSync(){if(cfg.scriptURL) setTimeout(syncData,400);}
+
+// Called after every local change — pushes immediately, silently
+async function autoSync() {
+  if(!cfg.scriptURL) return;
+  if(isSyncing) return;
+  isSyncing = true;
+  try {
+    await fetch(cfg.scriptURL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({action:'sync', employees:emps})
+    });
+    document.getElementById('syncPill').textContent = '✓ ' + new Date().toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit'});
+  } catch(e) {
+    document.getElementById('syncPill').textContent = '⚠ Sync failed';
+  }
+  isSyncing = false;
+}
+
+// Start the 5-minute background pull timer
+function startAutoSyncTimer() {
+  if(autoSyncTimer) clearInterval(autoSyncTimer);
+  autoSyncTimer = setInterval(() => {
+    syncData(true); // silent pull every 5 minutes
+  }, 5 * 60 * 1000);
+}
 
 // ══ INIT ══
 document.getElementById('eBd').value=todayStr();
