@@ -1312,16 +1312,18 @@ function saveSettings(){
 }
 
 // ══════════════════════════════════════════
-// GOOGLE SHEETS SYNC — BIDIRECTIONAL
-// PUSH via fetch no-cors (POST)
-// PULL via JSONP (bypasses CORS completely)
-// Auto-sync every 5 minutes
+// GOOGLE SHEETS SYNC
+// Strategy:
+//   PULL first (get master data from Sheets)
+//   MERGE with local (local new entries win)
+//   PUSH merged result back to Sheets
+// This ensures no device overwrites another
 // ══════════════════════════════════════════
 
 let isSyncing = false;
 let autoSyncTimer = null;
 
-// ── PULL via JSONP — only way to read from Apps Script in browser without CORS ──
+// ── PULL via JSONP — bypasses CORS ──
 function pullFromSheets() {
   return new Promise((resolve) => {
     const cbName = '_sscCb' + Date.now();
@@ -1330,89 +1332,139 @@ function pullFromSheets() {
 
     const cleanup = () => {
       done = true;
-      if(script.parentNode) script.parentNode.removeChild(script);
+      if (script.parentNode) script.parentNode.removeChild(script);
       delete window[cbName];
     };
 
     window[cbName] = function(data) {
       cleanup();
-      if(data && data.status==='ok' && Array.isArray(data.employees)) {
-        if(data.employees.length > 0 || emps.length === 0) {
-          emps = data.employees;
-          persist();
-          renderEmps();
-          if(activeId && !document.getElementById('modalProfile').classList.contains('hidden')) {
-            if(emps.find(e=>e.id===activeId)) renderLeaveList();
-          }
-        }
-        resolve(true);
+      if (data && data.status === 'ok' && Array.isArray(data.employees)) {
+        resolve(data.employees);
       } else {
-        resolve(false);
+        resolve(null);
       }
     };
 
-    setTimeout(() => { if(!done){ cleanup(); resolve(false); } }, 12000);
+    setTimeout(() => { if (!done) { cleanup(); resolve(null); } }, 12000);
 
     script.src = SCRIPT_URL + '?action=get&callback=' + cbName;
     document.head.appendChild(script);
   });
 }
 
-// ── PUSH via fetch no-cors ──
-async function pushToSheets() {
+// ── PUSH to Sheets ──
+async function pushToSheets(data) {
   try {
     await fetch(SCRIPT_URL, {
       method: 'POST',
       mode: 'no-cors',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({action:'sync', employees:emps})
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'sync', employees: data })
     });
     return true;
   } catch(e) { return false; }
 }
 
-// ── MAIN SYNC: push then pull ──
+// ── MERGE: combine Sheets data + local data ──
+// Rule: union of all employees by ID
+// For same employee ID — merge leaves too (union by leave ID)
+function mergeData(sheetsEmps, localEmps) {
+  if (!sheetsEmps || sheetsEmps.length === 0) return localEmps;
+  if (!localEmps  || localEmps.length  === 0) return sheetsEmps;
+
+  const merged = [...sheetsEmps];
+
+  for (const localEmp of localEmps) {
+    const existing = merged.find(e => e.id === localEmp.id);
+    if (!existing) {
+      // New employee only on this device — add it
+      merged.push(localEmp);
+    } else {
+      // Employee exists in both — merge their leave entries
+      const allLeaves = [...(existing.leaves || [])];
+      for (const localLeave of (localEmp.leaves || [])) {
+        if (!allLeaves.find(l => l.id === localLeave.id)) {
+          allLeaves.push(localLeave);
+        }
+      }
+      // Sort leaves by fromDate
+      allLeaves.sort((a,b) => new Date(a.fromDate) - new Date(b.fromDate));
+      existing.leaves = allLeaves;
+
+      // Also update profile fields if local has newer info
+      // (local edits should win over stale Sheets data)
+      existing.name        = localEmp.name;
+      existing.gender      = localEmp.gender;
+      existing.cadre       = localEmp.cadre;
+      existing.designation = localEmp.designation;
+      existing.level       = localEmp.level;
+      existing.basicPay    = localEmp.basicPay;
+      existing.dob         = localEmp.dob;
+      existing.retirement  = localEmp.retirement;
+      existing.remarks     = localEmp.remarks;
+    }
+  }
+
+  return merged;
+}
+
+// ── MAIN SYNC: Pull → Merge → Push ──
 async function syncData(silent=false) {
-  if(isSyncing) return;
+  if (isSyncing) return;
   isSyncing = true;
+
   const pill = document.getElementById('syncPill');
   pill.textContent = '⟳ Syncing…';
-  if(!silent) showLoad('Syncing with Google Sheets…');
+  if (!silent) showLoad('Syncing with Google Sheets…');
+
   try {
-    await pushToSheets();
-    await new Promise(r => setTimeout(r, 2000)); // wait for Sheets to write
-    await pullFromSheets();
-    pill.textContent = '✓ ' + new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
-    if(!silent) toast('Synced successfully.', 'ok');
+    // Step 1: Pull master data from Sheets
+    const sheetsData = await pullFromSheets();
+
+    // Step 2: Merge with local
+    const merged = mergeData(sheetsData, emps);
+
+    // Step 3: Update local with merged
+    emps = merged;
+    persist();
+    renderEmps();
+    if (activeId && !document.getElementById('modalProfile').classList.contains('hidden')) {
+      if (emps.find(e => e.id === activeId)) renderLeaveList();
+    }
+
+    // Step 4: Push merged data back to Sheets
+    await pushToSheets(emps);
+
+    pill.textContent = '✓ ' + new Date().toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit'});
+    if (!silent) toast('Synced successfully.', 'ok');
+
   } catch(e) {
     pill.textContent = '⚠ Sync failed';
-    if(!silent) toast('Sync failed.', 'err');
+    if (!silent) toast('Sync failed. Try again.', 'err');
   }
+
   isSyncing = false;
-  if(!silent) hideLoad();
+  if (!silent) hideLoad();
 }
 
-// ── After local add/edit — push only, fast ──
+// ── After local add/edit: push merged immediately ──
 async function autoSync() {
-  if(isSyncing) return;
-  try {
-    await pushToSheets();
-    document.getElementById('syncPill').textContent = '✓ ' + new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
-  } catch(e) {
-    document.getElementById('syncPill').textContent = '⚠ Push failed';
-  }
+  if (isSyncing) return;
+  // Pull first so we don't overwrite other device's work
+  const sheetsData = await pullFromSheets();
+  const merged = mergeData(sheetsData, emps);
+  emps = merged;
+  persist();
+  renderEmps();
+  await pushToSheets(emps);
+  document.getElementById('syncPill').textContent = '✓ ' + new Date().toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit'});
 }
 
-// ── Background timer: pull every 5 min ──
+// ── Background sync every 5 minutes (pull → merge → push) ──
 function startAutoSyncTimer() {
-  if(autoSyncTimer) clearInterval(autoSyncTimer);
-  autoSyncTimer = setInterval(async () => {
-    if(!isSyncing) {
-      isSyncing = true;
-      await pullFromSheets();
-      document.getElementById('syncPill').textContent = '✓ ' + new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
-      isSyncing = false;
-    }
+  if (autoSyncTimer) clearInterval(autoSyncTimer);
+  autoSyncTimer = setInterval(() => {
+    syncData(true);
   }, 5 * 60 * 1000);
 }
 
