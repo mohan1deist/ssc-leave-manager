@@ -774,9 +774,9 @@ select.inp { appearance: none; background-image: url("data:image/svg+xml,%3Csvg 
 // ══════════════════════════════════════════
 // STATE & CONFIG
 // ══════════════════════════════════════════
-const DEF = { adminUser:'sscnwr', adminPass:'ssc@nwr', editorUser:'editor', editorPass:'edit@nwr', viewerUser:'view', viewerPass:'view123', scriptURL:'https://script.google.com/macros/s/AKfycbwprSG8bRAQjCmcT9fbZabYKxDM6tOxPQ9P8cQdHvutJok14potftAkjtSHoSGat2IEnA/exec' };
+const DEF = { adminUser:'sscnwr', adminPass:'ssc@nwr', editorUser:'editor', editorPass:'edit@nwr', viewerUser:'view', viewerPass:'view123', scriptURL:'https://script.google.com/macros/s/AKfycbxCi7aIDNPso82I6iImGjRLI53sdFirBFE5Pd7Q-FjzWKPEO8H0vbM5AvbwXS_Az7Cf/exec' };
 let cfg = JSON.parse(localStorage.getItem('ssc_cfg') || 'null') || {...DEF};
-cfg.scriptURL = 'https://script.google.com/macros/s/AKfycbwprSG8bRAQjCmcT9fbZabYKxDM6tOxPQ9P8cQdHvutJok14potftAkjtSHoSGat2IEnA/exec'; // hardcoded — never changes regardless of device/browser
+cfg.scriptURL = 'https://script.google.com/macros/s/AKfycbxCi7aIDNPso82I6iImGjRLI53sdFirBFE5Pd7Q-FjzWKPEO8H0vbM5AvbwXS_Az7Cf/exec'; // hardcoded — never changes regardless of device/browser
 let emps = JSON.parse(localStorage.getItem('ssc_emps') || '[]');
 let isAdmin = false, isEditor = false, activeId = null, editLeaveId = null;
 
@@ -790,7 +790,7 @@ const uid = () => Date.now().toString(36) + Math.random().toString(36).substr(2,
 const todayStr = () => new Date().toISOString().split('T')[0];
 const fmtDate = d => { if(!d)return'—'; const dt=new Date(d+'T00:00:00'); return dt.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}); };
 const daysBetween = (d1,d2) => Math.round((new Date(d2+'T00:00:00')-new Date(d1+'T00:00:00'))/86400000)+1;
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwprSG8bRAQjCmcT9fbZabYKxDM6tOxPQ9P8cQdHvutJok14potftAkjtSHoSGat2IEnA/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxCi7aIDNPso82I6iImGjRLI53sdFirBFE5Pd7Q-FjzWKPEO8H0vbM5AvbwXS_Az7Cf/exec';
 const persist = () => {
   cfg.scriptURL = SCRIPT_URL; // always hardcoded, never lost
   localStorage.setItem('ssc_emps',JSON.stringify(emps));
@@ -1313,91 +1313,106 @@ function saveSettings(){
 
 // ══════════════════════════════════════════
 // GOOGLE SHEETS SYNC — BIDIRECTIONAL
-// Push local → Sheets, Pull Sheets → local
+// PUSH via fetch no-cors (POST)
+// PULL via JSONP (bypasses CORS completely)
 // Auto-sync every 5 minutes
 // ══════════════════════════════════════════
 
 let isSyncing = false;
 let autoSyncTimer = null;
 
+// ── PULL via JSONP — only way to read from Apps Script in browser without CORS ──
+function pullFromSheets() {
+  return new Promise((resolve) => {
+    const cbName = '_sscCb' + Date.now();
+    const script = document.createElement('script');
+    let done = false;
+
+    const cleanup = () => {
+      done = true;
+      if(script.parentNode) script.parentNode.removeChild(script);
+      delete window[cbName];
+    };
+
+    window[cbName] = function(data) {
+      cleanup();
+      if(data && data.status==='ok' && Array.isArray(data.employees)) {
+        if(data.employees.length > 0 || emps.length === 0) {
+          emps = data.employees;
+          persist();
+          renderEmps();
+          if(activeId && !document.getElementById('modalProfile').classList.contains('hidden')) {
+            if(emps.find(e=>e.id===activeId)) renderLeaveList();
+          }
+        }
+        resolve(true);
+      } else {
+        resolve(false);
+      }
+    };
+
+    setTimeout(() => { if(!done){ cleanup(); resolve(false); } }, 12000);
+
+    script.src = SCRIPT_URL + '?action=get&callback=' + cbName;
+    document.head.appendChild(script);
+  });
+}
+
+// ── PUSH via fetch no-cors ──
+async function pushToSheets() {
+  try {
+    await fetch(SCRIPT_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({action:'sync', employees:emps})
+    });
+    return true;
+  } catch(e) { return false; }
+}
+
+// ── MAIN SYNC: push then pull ──
 async function syncData(silent=false) {
-  if(!cfg.scriptURL){
-    if(!silent) toast('No Apps Script URL. Go to ⚙ Settings.','wrn');
-    return;
-  }
   if(isSyncing) return;
   isSyncing = true;
   const pill = document.getElementById('syncPill');
   pill.textContent = '⟳ Syncing…';
   if(!silent) showLoad('Syncing with Google Sheets…');
-
   try {
-    // ── STEP 1: PUSH local data to Sheets ──
-    await fetch(cfg.scriptURL, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({action:'sync', employees:emps})
-    });
-
-    // ── STEP 2: PULL latest data from Sheets ──
-    // We use a script URL with ?action=get to fetch JSON back
-    const res = await fetch(cfg.scriptURL + '?action=get', {
-      method: 'GET',
-      mode: 'cors'
-    });
-
-    if(res.ok) {
-      const data = await res.json();
-      if(data.status === 'ok' && Array.isArray(data.employees) && data.employees.length >= emps.length) {
-        // Only overwrite if server has equal or more data (prevents empty wipe)
-        emps = data.employees;
-        persist();
-        renderEmps();
-        // If a profile is open, refresh it
-        if(activeId && !document.getElementById('modalProfile').classList.contains('hidden')) {
-          const stillExists = emps.find(e => e.id === activeId);
-          if(stillExists) renderLeaveList();
-        }
-      }
-    }
-
-    pill.textContent = '✓ ' + new Date().toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit'});
+    await pushToSheets();
+    await new Promise(r => setTimeout(r, 2000)); // wait for Sheets to write
+    await pullFromSheets();
+    pill.textContent = '✓ ' + new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
     if(!silent) toast('Synced successfully.', 'ok');
-
   } catch(e) {
     pill.textContent = '⚠ Sync failed';
-    if(!silent) toast('Sync failed. Check Apps Script URL.', 'err');
+    if(!silent) toast('Sync failed.', 'err');
   }
-
   isSyncing = false;
   if(!silent) hideLoad();
 }
 
-// Called after every local change — pushes immediately, silently
+// ── After local add/edit — push only, fast ──
 async function autoSync() {
-  if(!cfg.scriptURL) return;
   if(isSyncing) return;
-  isSyncing = true;
   try {
-    await fetch(cfg.scriptURL, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({action:'sync', employees:emps})
-    });
-    document.getElementById('syncPill').textContent = '✓ ' + new Date().toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit'});
+    await pushToSheets();
+    document.getElementById('syncPill').textContent = '✓ ' + new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
   } catch(e) {
-    document.getElementById('syncPill').textContent = '⚠ Sync failed';
+    document.getElementById('syncPill').textContent = '⚠ Push failed';
   }
-  isSyncing = false;
 }
 
-// Start the 5-minute background pull timer
+// ── Background timer: pull every 5 min ──
 function startAutoSyncTimer() {
   if(autoSyncTimer) clearInterval(autoSyncTimer);
-  autoSyncTimer = setInterval(() => {
-    syncData(true); // silent pull every 5 minutes
+  autoSyncTimer = setInterval(async () => {
+    if(!isSyncing) {
+      isSyncing = true;
+      await pullFromSheets();
+      document.getElementById('syncPill').textContent = '✓ ' + new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+      isSyncing = false;
+    }
   }, 5 * 60 * 1000);
 }
 
