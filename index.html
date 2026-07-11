@@ -379,6 +379,7 @@ select option{background:#17223A;color:#EDEFF5;}
       <div class="card" id="profileCard"></div>
       <div class="section-title" style="align-items:center;">
         <span>Leave transactions</span><div class="rule"></div>
+        <button class="btn btn-ghost" id="printProfileBtn">🖨 Print summary</button>
         <button class="btn btn-primary" id="addTxnBtn" style="display:none">+ Add leave entry</button>
       </div>
       <div style="overflow-x:auto;">
@@ -413,6 +414,11 @@ select option{background:#17223A;color:#EDEFF5;}
         <h3 style="font-size:15px;margin-bottom:6px;">EL / HPL focus report (biannual)</h3>
         <div style="color:var(--muted);font-size:12.5px;margin-bottom:12px;">Snapshot generated for 1 Jan / 1 Jul cycles — shows EL &amp; HPL balances and last 6 months' movement for every active employee.</div>
         <button class="btn btn-ghost" id="elhplBtn">Generate EL/HPL report</button>
+      </div>
+      <div class="card" style="margin-top:16px;">
+        <h3 style="font-size:15px;margin-bottom:6px;">All-employee leave balance summary</h3>
+        <div style="color:var(--muted);font-size:12.5px;margin-bottom:12px;">Every active employee with EL, HPL, CL, RH, SCL and Comp Off balances in one printable table — for office records or circulation.</div>
+        <button class="btn btn-ghost" id="allBalBtn">Generate &amp; print</button>
       </div>
       <div class="report-output" id="reportOutput" style="display:none;"></div>
     </section>
@@ -787,6 +793,10 @@ document.getElementById('addEmpBtn').onclick = ()=>{
   ['f_el','f_hpl','f_cl','f_rh','f_scl','f_compoff'].forEach(id=>document.getElementById(id).value=0);
   empModal.classList.add('active');
 };
+function toDateInputValue(v){
+  if(!v) return '';
+  return String(v).slice(0,10);
+}
 function openEditEmployee(emp){
   editingEmpId = emp.EmpID;
   document.getElementById('empModalTitle').textContent='Edit employee';
@@ -795,9 +805,9 @@ function openEditEmployee(emp){
   document.getElementById('f_cadre').value=emp.Cadre||'';
   document.getElementById('f_designation').value=emp.Designation||'';
   document.getElementById('f_paylevel').value=emp.PayLevel||'Level 1';
-  document.getElementById('f_balDate').value=emp.BalanceAsOnDate||todayISO();
-  document.getElementById('f_dob').value=emp.DOB||'';
-  document.getElementById('f_retire').value=emp.RetirementDate||'';
+  document.getElementById('f_balDate').value=toDateInputValue(emp.BalanceAsOnDate)||todayISO();
+  document.getElementById('f_dob').value=toDateInputValue(emp.DOB);
+  document.getElementById('f_retire').value=toDateInputValue(emp.RetirementDate);
   document.getElementById('f_basic').value=emp.BasicPay||'';
   document.getElementById('f_remarks').value=emp.Remarks||'';
   document.getElementById('f_el').value=emp.EL_Balance||0;
@@ -932,9 +942,10 @@ function renderProfile(empId){
     });
   }
   document.getElementById('addTxnBtn').onclick = ()=>openAddTxn(empId);
+  document.getElementById('printProfileBtn').onclick = ()=>window.print();
 }
 function leaveTypeLabel(t){
-  const map = {EL:'Earned Leave',CL:'Casual Leave',HPL:'Half Pay Leave',Maternity:'Maternity Leave',Paternity:'Paternity Leave',RH:'Restricted Holiday',SCL:'Special Casual Leave',CompOff:'Comp Off (grant)',Commuted:'Commuted Leave'};
+  const map = {EL:'Earned Leave',CL:'Casual Leave',HPL:'Half Pay Leave',Maternity:'Maternity Leave',Paternity:'Paternity Leave',RH:'Restricted Holiday',SCL:'Special Casual Leave',CompOff:'Comp Off (grant)',Commuted:'Commuted Leave',AutoCredit:'⚡ Auto Credit'};
   return map[t]||t;
 }
 
@@ -1159,9 +1170,21 @@ document.getElementById('elhplBtn').onclick = ()=>{
       const hplUsed = recent.filter(t=>t.LeaveType==='HPL'||t.LeaveType==='Commuted').reduce((s,t)=>s+Number(t.Days)*(t.LeaveType==='Commuted'?2:1),0);
       return `<tr><td>${e.Name}</td><td>${e.Cadre}</td><td>${e.EL_Balance}</td><td>${e.HPL_Balance}</td><td>${elUsed}</td><td>${hplUsed}</td></tr>`;
     }).join('')}</tbody></table>`;
+  setTimeout(()=>window.print(), 300);
 };
 
 /* ---------- Settings ---------- */
+document.getElementById('allBalBtn').onclick = ()=>{
+  const out = document.getElementById('reportOutput');
+  out.style.display='block';
+  const sorted = STATE.employees.slice().sort((a,b)=>(a.Name||'').localeCompare(b.Name||''));
+  out.innerHTML = `
+    <h3 style="margin-bottom:4px;">All-Employee Leave Balance Summary</h3>
+    <div style="color:var(--muted);font-size:12.5px;margin-bottom:10px;">As on ${fmtDate(todayISO())} · SSC NWR</div>
+    <table><thead><tr><th>Name</th><th>Cadre</th><th>Designation</th><th>EL</th><th>HPL</th><th>CL</th><th>RH</th><th>SCL</th><th>Comp Off</th></tr></thead>
+    <tbody>${sorted.map(e=>`<tr><td>${e.Name}</td><td>${e.Cadre}</td><td>${e.Designation||''}</td><td>${e.EL_Balance}</td><td>${e.HPL_Balance}</td><td>${e.CL_Balance}</td><td>${e.RH_Balance}</td><td>${e.SCL_Balance}</td><td>${e.CompOff_Balance}</td></tr>`).join('')||'<tr><td colspan="9">No employees.</td></tr>'}</tbody></table>`;
+  setTimeout(()=>window.print(), 300);
+};
 document.getElementById('saveSettingsBtn').onclick = async ()=>{
   const pass = document.getElementById('viewerPassInput').value;
   STATE.settings.viewerPassword = pass;
