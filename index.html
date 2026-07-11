@@ -259,6 +259,34 @@ select option{background:#17223A;color:#EDEFF5;}
 }
 .toast.show{transform:translateY(0);opacity:1;}
 .toast.err{border-color:rgba(228,99,111,0.4);}
+.print-letterhead{display:none;}
+@media print{
+  body{background:#fff !important;color:#111 !important;}
+  .sidebar,.topbar,.toolbar,.overlay,#printProfileBtn,#addTxnBtn,.grid.grid-2,.card:has(#runSummaryBtn),.card:has(#printStmtBtn),.card:has(#elhplBtn),.card:has(#allBalBtn){display:none !important;}
+  .main{padding:0 !important;}
+  .app{display:block !important;}
+  .view{display:none !important;}
+  .view.active{display:block !important;}
+  .print-letterhead{display:block !important;text-align:center;margin-bottom:18px;border-bottom:2px solid #111;padding-bottom:12px;}
+  .print-letterhead .org{font-family:'Fraunces',serif;font-size:19px;font-weight:700;color:#111;}
+  .print-letterhead .sub{font-size:11.5px;color:#444;margin-top:2px;letter-spacing:0.4px;text-transform:uppercase;}
+  .print-letterhead .gen{font-size:10.5px;color:#666;margin-top:6px;}
+  .report-output, #profileCard{
+    background:#fff !important;border:1px solid #ccc !important;box-shadow:none !important;color:#111 !important;
+    padding:18px !important;
+  }
+  .report-output h3, .profile-name{color:#111 !important;font-family:'Fraunces',serif;}
+  .report-output table, .txn-table{width:100%;border-collapse:collapse;margin-top:10px;}
+  .report-output th,.report-output td,.txn-table th,.txn-table td{
+    border:1px solid #999 !important;color:#111 !important;padding:6px 9px;font-size:11.5px;background:#fff !important;
+  }
+  .report-output th, .txn-table th{background:#f0f0f0 !important;font-weight:700;text-transform:uppercase;font-size:10px;letter-spacing:0.3px;}
+  .balance-chip, .balances-strip>*{background:#fff !important;border:1px solid #999 !important;color:#111 !important;}
+  .balance-chip .v{color:#111 !important;}
+  .cadre-tag{background:transparent !important;border:1px solid #999 !important;color:#111 !important;}
+  .icon-btn{display:none !important;}
+  a[href]:after{content:'';}
+}
 @media print{
   .sidebar,.topbar,.toolbar,.overlay{display:none !important;}
 }
@@ -282,9 +310,9 @@ select option{background:#17223A;color:#EDEFF5;}
     <h1>Leave Management</h1>
     <div class="sub">SSC · Northern Western Region</div>
     <div class="login-tabs">
-      <button class="login-tab active" data-role="viewer">Viewer</button>
+      <button class="login-tab active" data-role="admin">Admin</button>
       <button class="login-tab" data-role="editor">Editor</button>
-      <button class="login-tab" data-role="admin">Admin</button>
+      <button class="login-tab" data-role="viewer">Viewer</button>
     </div>
     <div id="loginPassWrap">
       <input type="password" id="loginPass" placeholder="Password">
@@ -376,6 +404,7 @@ select option{background:#17223A;color:#EDEFF5;}
       <div class="topbar">
         <button class="btn btn-ghost" id="backToEmp">← Back</button>
       </div>
+      <div class="print-letterhead"><div class="org">SSC · Northern Western Region</div><div class="sub">Leave Management System — Employee Leave Statement</div><div class="gen" id="profileGenAt"></div></div>
       <div class="card" id="profileCard"></div>
       <div class="section-title" style="align-items:center;">
         <span>Leave transactions</span><div class="rule"></div>
@@ -411,15 +440,14 @@ select option{background:#17223A;color:#EDEFF5;}
         </div>
       </div>
       <div class="card" style="margin-top:16px;">
-        <h3 style="font-size:15px;margin-bottom:6px;">EL / HPL focus report (biannual)</h3>
-        <div style="color:var(--muted);font-size:12.5px;margin-bottom:12px;">Snapshot generated for 1 Jan / 1 Jul cycles — shows EL &amp; HPL balances and last 6 months' movement for every active employee.</div>
-        <button class="btn btn-ghost" id="elhplBtn">Generate EL/HPL report</button>
-      </div>
-      <div class="card" style="margin-top:16px;">
-        <h3 style="font-size:15px;margin-bottom:6px;">All-employee leave balance summary</h3>
-        <div style="color:var(--muted);font-size:12.5px;margin-bottom:12px;">Every active employee with EL, HPL, CL, RH, SCL and Comp Off balances in one printable table — for office records or circulation.</div>
+        <h3 style="font-size:15px;margin-bottom:6px;">Leave balance report — all types, as on any date</h3>
+        <div style="color:var(--muted);font-size:12.5px;margin-bottom:12px;">Reconstructs EL, HPL, CL, RH, SCL and Comp Off balances for every active employee as they stood on a chosen date, by reversing entries recorded after that date. Also useful for the 1 Jan / 1 Jul biannual snapshot.</div>
+        <div class="form-row" style="max-width:320px;">
+          <div class="form-field"><label>As on date</label><input type="date" id="asOnDate"></div>
+        </div>
         <button class="btn btn-ghost" id="allBalBtn">Generate &amp; print</button>
       </div>
+      <div class="print-letterhead"><div class="org">SSC · Northern Western Region</div><div class="sub">Leave Management System — Official Report</div><div class="gen" id="reportGenAt"></div></div>
       <div class="report-output" id="reportOutput" style="display:none;"></div>
     </section>
 
@@ -438,6 +466,13 @@ select option{background:#17223A;color:#EDEFF5;}
     <section class="view" id="view-settings">
       <div class="topbar"><h2>Settings</h2></div>
       <div class="card" style="max-width:480px;">
+        <h3 style="font-size:15px;margin-bottom:14px;">Change admin / editor password</h3>
+        <div style="color:var(--muted);font-size:12.5px;margin-bottom:12px;">Leave a field blank to keep its current password unchanged.</div>
+        <div class="form-field" style="margin-bottom:12px;"><label>New admin password</label><input type="text" id="adminPassInput" placeholder="Leave blank to keep current"></div>
+        <div class="form-field" style="margin-bottom:12px;"><label>New editor password</label><input type="text" id="editorPassInput" placeholder="Leave blank to keep current"></div>
+        <button class="btn btn-primary" id="saveRolePassBtn">Update passwords</button>
+      </div>
+      <div class="card" style="max-width:480px;margin-top:16px;">
         <h3 style="font-size:15px;margin-bottom:14px;">Viewer password</h3>
         <div style="color:var(--muted);font-size:12.5px;margin-bottom:12px;">Optional — leave blank to keep viewer access open with no password.</div>
         <div class="form-field" style="margin-bottom:12px;"><input type="text" id="viewerPassInput" placeholder="Set viewer password (optional)"></div>
@@ -627,7 +662,8 @@ function startAutoSync(){
 }
 
 /* ---------- Login ---------- */
-let selectedRole = 'viewer';
+let selectedRole = 'admin';
+document.getElementById('loginPassWrap').style.display = 'block';
 document.querySelectorAll('.login-tab').forEach(tab=>{
   tab.onclick = ()=>{
     document.querySelectorAll('.login-tab').forEach(t=>t.classList.remove('active'));
@@ -640,8 +676,10 @@ document.querySelectorAll('.login-tab').forEach(tab=>{
 document.getElementById('loginBtn').onclick = async ()=>{
   const pass = document.getElementById('loginPass').value;
   const err = document.getElementById('loginErr');
-  if(selectedRole==='admin' && pass!==PASSWORDS.admin){ err.textContent='Incorrect admin password.'; return; }
-  if(selectedRole==='editor' && pass!==PASSWORDS.editor){ err.textContent='Incorrect editor password.'; return; }
+  const adminPass = STATE.settings.adminPassword || PASSWORDS.admin;
+  const editorPass = STATE.settings.editorPassword || PASSWORDS.editor;
+  if(selectedRole==='admin' && pass!==adminPass){ err.textContent='Incorrect admin password.'; return; }
+  if(selectedRole==='editor' && pass!==editorPass){ err.textContent='Incorrect editor password.'; return; }
   if(selectedRole==='viewer' && STATE.settings.viewerPassword && pass!==STATE.settings.viewerPassword){ err.textContent='Incorrect viewer password.'; return; }
   STATE.role = selectedRole;
   enterApp();
@@ -888,6 +926,7 @@ document.getElementById('backToEmp').onclick = ()=>{
 };
 function renderProfile(empId){
   const e = STATE.employees.find(x=>x.EmpID===empId); if(!e) return;
+  document.getElementById('profileGenAt').textContent = e.Name + ' · Generated ' + new Date().toLocaleString('en-IN');
   const canEdit = STATE.role==='admin' || STATE.role==='editor';
   const isAdmin = STATE.role==='admin';
   document.getElementById('profileCard').innerHTML = `
@@ -1171,39 +1210,75 @@ document.getElementById('printStmtBtn').onclick = ()=>{
     <tbody>${txns.map(t=>`<tr><td>${leaveTypeLabel(t.LeaveType)}</td><td>${fmtDate(t.StartDate)}</td><td>${fmtDate(t.EndDate)}</td><td>${t.Days}</td><td>${t.Reason||''}</td></tr>`).join('')||'<tr><td colspan="5">No transactions in range.</td></tr>'}</tbody></table>`;
   setTimeout(()=>window.print(), 300);
 };
-document.getElementById('elhplBtn').onclick = ()=>{
-  const sixMonthsAgo = new Date(); sixMonthsAgo.setMonth(sixMonthsAgo.getMonth()-6);
+document.getElementById('elhplBtn') && (document.getElementById('elhplBtn').onclick = null);
+
+function reconstructBalanceAsOn(emp, asOnDateStr){
+  const baseline = (emp.BalanceAsOnDate||'').slice(0,10);
+  if(baseline && asOnDateStr < baseline){
+    return null; // before the recorded opening baseline — cannot reconstruct
+  }
+  const bal = {
+    EL: emp.EL_Balance, HPL: emp.HPL_Balance, CL: emp.CL_Balance,
+    RH: emp.RH_Balance, SCL: emp.SCL_Balance, CompOff: emp.CompOff_Balance
+  };
+  const after = STATE.transactions.filter(t=>t.EmpID===emp.EmpID && (t.StartDate||'').slice(0,10) > asOnDateStr);
+  after.forEach(t=>{
+    const days = Number(t.Days)||0;
+    if(t.LeaveType==='AutoCredit'){
+      bal.EL -= Number(t.EL_Delta||0);
+      bal.HPL -= Number(t.HPL_Delta||0);
+      // Note: CL/RH resets performed by auto-credit are not reversed here
+      // (a reset has no fixed prior value to restore), so CL/RH figures in
+      // an as-on-date report are only exact within the current CL/RH cycle.
+    } else if(t.LeaveType==='Commuted'){
+      bal.HPL += days*2;
+    } else if(t.LeaveType==='CompOff'){
+      bal.CompOff -= days;
+    } else if(t.LeaveType==='Maternity' || t.LeaveType==='Paternity'){
+      // no balance field affected
+    } else if(bal[t.LeaveType]!==undefined){
+      bal[t.LeaveType] += days;
+    }
+  });
+  return bal;
+}
+document.getElementById('allBalBtn').onclick = ()=>{
+  const asOnDate = document.getElementById('asOnDate').value || todayISO();
   const out = document.getElementById('reportOutput');
   out.style.display='block';
+  document.getElementById('reportGenAt').textContent = 'Generated ' + new Date().toLocaleString('en-IN') + ' · Balances as on ' + fmtDate(asOnDate);
+  const sorted = STATE.employees.slice().sort((a,b)=>(a.Name||'').localeCompare(b.Name||''));
+  const rows = sorted.map(e=>{
+    const b = reconstructBalanceAsOn(e, asOnDate);
+    if(!b) return `<tr><td>${e.Name}</td><td colspan="6" style="color:var(--muted)">No baseline recorded before ${fmtDate(asOnDate)}</td></tr>`;
+    return `<tr><td>${e.Name}</td><td>${b.EL}</td><td>${b.HPL}</td><td>${b.CL}</td><td>${b.RH}</td><td>${b.SCL}</td><td>${b.CompOff}</td></tr>`;
+  }).join('') || '<tr><td colspan="7">No employees.</td></tr>';
   out.innerHTML = `
-    <h3 style="margin-bottom:10px;">EL / HPL Focus Report</h3>
-    <table><thead><tr><th>Name</th><th>Cadre</th><th>EL Balance</th><th>HPL Balance</th><th>EL used (6 mo)</th><th>HPL used (6 mo)</th></tr></thead>
-    <tbody>${STATE.employees.map(e=>{
-      const recent = STATE.transactions.filter(t=>t.EmpID===e.EmpID && new Date(t.StartDate)>=sixMonthsAgo);
-      const elUsed = recent.filter(t=>t.LeaveType==='EL').reduce((s,t)=>s+Number(t.Days),0);
-      const hplUsed = recent.filter(t=>t.LeaveType==='HPL'||t.LeaveType==='Commuted').reduce((s,t)=>s+Number(t.Days)*(t.LeaveType==='Commuted'?2:1),0);
-      return `<tr><td>${e.Name}</td><td>${e.Cadre}</td><td>${e.EL_Balance}</td><td>${e.HPL_Balance}</td><td>${elUsed}</td><td>${hplUsed}</td></tr>`;
-    }).join('')}</tbody></table>`;
+    <h3 style="margin-bottom:4px;">Leave Balance Report — All Types</h3>
+    <div style="color:var(--muted);font-size:12.5px;margin-bottom:10px;">As on ${fmtDate(asOnDate)} · SSC NWR · ${sorted.length} employees</div>
+    <table><thead><tr><th>Name</th><th>EL</th><th>HPL</th><th>CL</th><th>RH</th><th>SCL</th><th>Comp Off</th></tr></thead>
+    <tbody>${rows}</tbody></table>`;
   setTimeout(()=>window.print(), 300);
 };
 
 /* ---------- Settings ---------- */
-document.getElementById('allBalBtn').onclick = ()=>{
-  const out = document.getElementById('reportOutput');
-  out.style.display='block';
-  const sorted = STATE.employees.slice().sort((a,b)=>(a.Name||'').localeCompare(b.Name||''));
-  out.innerHTML = `
-    <h3 style="margin-bottom:4px;">All-Employee Leave Balance Summary</h3>
-    <div style="color:var(--muted);font-size:12.5px;margin-bottom:10px;">As on ${fmtDate(todayISO())} · SSC NWR</div>
-    <table><thead><tr><th>Name</th><th>Cadre</th><th>Designation</th><th>EL</th><th>HPL</th><th>CL</th><th>RH</th><th>SCL</th><th>Comp Off</th></tr></thead>
-    <tbody>${sorted.map(e=>`<tr><td>${e.Name}</td><td>${e.Cadre}</td><td>${e.Designation||''}</td><td>${e.EL_Balance}</td><td>${e.HPL_Balance}</td><td>${e.CL_Balance}</td><td>${e.RH_Balance}</td><td>${e.SCL_Balance}</td><td>${e.CompOff_Balance}</td></tr>`).join('')||'<tr><td colspan="9">No employees.</td></tr>'}</tbody></table>`;
-  setTimeout(()=>window.print(), 300);
-};
 document.getElementById('saveSettingsBtn').onclick = async ()=>{
   const pass = document.getElementById('viewerPassInput').value;
   STATE.settings.viewerPassword = pass;
   await apiPost('lms_updateSettings', {viewerPassword: pass});
   stampSeal(); toast('Settings saved.');
+};
+document.getElementById('saveRolePassBtn').onclick = async ()=>{
+  const newAdmin = document.getElementById('adminPassInput').value.trim();
+  const newEditor = document.getElementById('editorPassInput').value.trim();
+  const payload = {};
+  if(newAdmin){ STATE.settings.adminPassword = newAdmin; payload.adminPassword = newAdmin; }
+  if(newEditor){ STATE.settings.editorPassword = newEditor; payload.editorPassword = newEditor; }
+  if(!Object.keys(payload).length){ toast('Enter at least one new password.', true); return; }
+  await apiPost('lms_updateSettings', payload);
+  stampSeal(); toast('Password(s) updated.');
+  document.getElementById('adminPassInput').value='';
+  document.getElementById('editorPassInput').value='';
 };
 </script>
 </body>
