@@ -534,7 +534,7 @@ select option{background:#17223A;color:#EDEFF5;}
    CONFIG — paste your Apps Script Web App URL below (the combined script
    URL you already use for My Office Hub).
    ========================================================================= */
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyjgsjY8Nu1zG6fRSY3JsVBKe-9poc7CB7LUVi6Vu_bCJkG13L-9hRVHcCBPiWXlnVK/exec";
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxMRc0z-xz5jbxEp5Y6C6_Ex-DSZHQ-zv4cSjion0hI6zRjXKwlQ9vQk6KbBeRiqch8/exec";
 const PASSWORDS = { admin: "ssc@nwr", editor: "edit@nwr" };
 const PAY_LEVELS = Array.from({length:13}, (_,i)=>`Level ${i+1}`);
 
@@ -890,7 +890,7 @@ function renderProfile(empId){
         <div class="balance-chip"><div class="v" style="color:${e[k+'_Balance']<0?'var(--danger)':'var(--text)'}">${e[k+'_Balance']}</div><div class="k">${k}</div></div>
       `).join('')}
     </div>
-    <div style="font-size:12px;color:var(--muted);">Balance as on ${fmtDate(e.BalanceAsOnDate)}</div>
+    <div style="font-size:12px;color:var(--muted);">Live balance as on ${fmtDate(todayISO())} · opening balance was recorded as on ${fmtDate(e.BalanceAsOnDate)}</div>
   `;
   if(canEdit) document.getElementById('editEmpBtn').onclick = ()=>openEditEmployee(e);
   if(isAdmin){
