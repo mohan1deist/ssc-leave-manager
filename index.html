@@ -846,6 +846,19 @@ document.getElementById('saveEmpBtn').onclick = async ()=>{
     const preserved = STATE.employees[idx];
     emp.Maternity_Used = preserved.Maternity_Used||0; emp.Paternity_Used = preserved.Paternity_Used||0;
     emp.CreatedAt = preserved.CreatedAt;
+    // If the "balance as on" date was changed, this is a deliberate new
+    // opening-balance baseline — re-arm auto-credit so EL/HPL/CL/RH get
+    // forward-credited again from this new starting point on the next
+    // sync. If the date wasn't touched, keep the existing credit history
+    // so a routine edit (e.g. fixing a designation) doesn't accidentally
+    // double-credit leave that was already applied.
+    if(emp.BalanceAsOnDate && emp.BalanceAsOnDate !== preserved.BalanceAsOnDate){
+      emp.LastJanCreditYear = 0;
+      emp.LastJulCreditYear = 0;
+    } else {
+      emp.LastJanCreditYear = preserved.LastJanCreditYear;
+      emp.LastJulCreditYear = preserved.LastJulCreditYear;
+    }
     STATE.employees[idx] = {...preserved, ...emp};
     await apiPost('lms_updateEmployee', STATE.employees[idx]);
   } else {
@@ -855,7 +868,8 @@ document.getElementById('saveEmpBtn').onclick = async ()=>{
   }
   stampSeal();
   empModal.classList.remove('active');
-  renderAll();
+  await apiPost('lms_runCredits', {});
+  await pullFromSheet();
   toast('Employee saved.');
 };
 
