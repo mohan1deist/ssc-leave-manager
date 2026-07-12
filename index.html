@@ -1185,13 +1185,19 @@ document.getElementById('runSummaryBtn').onclick = ()=>{
   const empId = document.getElementById('repEmp').value;
   const asOn = document.getElementById('repDate').value;
   const e = STATE.employees.find(x=>x.EmpID===empId); if(!e) return;
-  const txnsUpto = STATE.transactions.filter(t=>t.EmpID===empId && new Date(t.StartDate)<=new Date(asOn));
+  const b = reconstructBalanceAsOn(e, asOn);
+  const txnsUpto = STATE.transactions.filter(t=>t.EmpID===empId && (t.StartDate||'').slice(0,10) <= asOn && t.LeaveType!=='AutoCredit');
   const out = document.getElementById('reportOutput');
   out.style.display='block';
+  document.getElementById('reportGenAt').textContent = e.Name + ' · Generated ' + new Date().toLocaleString('en-IN') + ' · As on ' + fmtDate(asOn);
+  if(!b){
+    out.innerHTML = `<h3>${e.Name} — Leave Summary as on ${fmtDate(asOn)}</h3><div style="color:var(--muted);margin-top:10px;">No opening balance was recorded before this date — cannot reconstruct.</div>`;
+    return;
+  }
   out.innerHTML = `
     <h3 style="margin-bottom:10px;">${e.Name} — Leave Summary as on ${fmtDate(asOn)}</h3>
     <div class="balances-strip">
-      ${['EL','HPL','CL','RH','SCL','CompOff'].map(k=>`<div class="balance-chip"><div class="v">${e[k+'_Balance']}</div><div class="k">${k}</div></div>`).join('')}
+      ${['EL','HPL','CL','RH','SCL','CompOff'].map(k=>`<div class="balance-chip"><div class="v">${b[k]}</div><div class="k">${k}</div></div>`).join('')}
     </div>
     <table><thead><tr><th>Type</th><th>From</th><th>To</th><th>Days</th><th>Reason</th></tr></thead>
     <tbody>${txnsUpto.map(t=>`<tr><td>${leaveTypeLabel(t.LeaveType)}</td><td>${fmtDate(t.StartDate)}</td><td>${fmtDate(t.EndDate)}</td><td>${t.Days}</td><td>${t.Reason||''}</td></tr>`).join('')||'<tr><td colspan="5">No transactions.</td></tr>'}</tbody></table>`;
@@ -1200,18 +1206,42 @@ document.getElementById('printStmtBtn').onclick = ()=>{
   const empId = document.getElementById('repEmp2').value;
   const from = document.getElementById('repFrom').value, to = document.getElementById('repTo').value;
   const e = STATE.employees.find(x=>x.EmpID===empId); if(!e || !from || !to) { toast('Select employee and date range.', true); return; }
-  const txns = STATE.transactions.filter(t=>t.EmpID===empId && new Date(t.StartDate)>=new Date(from) && new Date(t.StartDate)<=new Date(to));
+  const txns = STATE.transactions.filter(t=>t.EmpID===empId && t.LeaveType!=='AutoCredit' && (t.StartDate||'').slice(0,10)>=from && (t.StartDate||'').slice(0,10)<=to);
+  const b = reconstructBalanceAsOn(e, to);
   const out = document.getElementById('reportOutput');
   out.style.display='block';
+  document.getElementById('reportGenAt').textContent = e.Name + ' · Generated ' + new Date().toLocaleString('en-IN');
   out.innerHTML = `
     <h3>Leave Statement — ${e.Name}</h3>
     <div style="color:var(--muted);font-size:12.5px;margin-bottom:10px;">${fmtDate(from)} to ${fmtDate(to)} · ${e.Designation}, ${e.Cadre}, ${e.PayLevel}</div>
+    ${b?`<div class="balances-strip">${['EL','HPL','CL','RH','SCL','CompOff'].map(k=>`<div class="balance-chip"><div class="v">${b[k]}</div><div class="k">${k}</div></div>`).join('')}</div><div style="color:var(--muted);font-size:11.5px;margin:6px 0 12px;">Balance as on ${fmtDate(to)}</div>`:''}
     <table><thead><tr><th>Type</th><th>From</th><th>To</th><th>Days</th><th>Reason</th></tr></thead>
     <tbody>${txns.map(t=>`<tr><td>${leaveTypeLabel(t.LeaveType)}</td><td>${fmtDate(t.StartDate)}</td><td>${fmtDate(t.EndDate)}</td><td>${t.Days}</td><td>${t.Reason||''}</td></tr>`).join('')||'<tr><td colspan="5">No transactions in range.</td></tr>'}</tbody></table>`;
   setTimeout(()=>window.print(), 300);
 };
 document.getElementById('elhplBtn') && (document.getElementById('elhplBtn').onclick = null);
 
+function addDaysStr(dateStr, n){
+  const d = new Date(dateStr); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10);
+}
+// How much of a transaction's Days actually falls AFTER the cutoff date —
+// i.e. the portion that should be reversed to get the balance AS ON that
+// date. A leave spanning 28 Jun–4 Jul, viewed "as on 30 Jun", should only
+// have its 1 Jul–4 Jul portion (the part after the cutoff) added back;
+// the 28–30 Jun portion already happened by the cutoff and stays deducted.
+function futurePortionDays(t, asOnDateStr){
+  const s = (t.StartDate||'').slice(0,10), en = (t.EndDate||'').slice(0,10) || s;
+  const days = Number(t.Days)||0;
+  if(!s) return days;
+  if(en <= asOnDateStr) return 0;           // entirely on/before cutoff — nothing to reverse
+  if(s > asOnDateStr) return days;          // entirely after cutoff — reverse in full
+  // spans the cutoff: reverse only the after-cutoff portion, allocated
+  // proportionally across the calendar span (handles half-day CL etc. too)
+  const totalSpan = daysBetween(s, en);
+  const rate = totalSpan > 0 ? days / totalSpan : days;
+  const futureSpan = Math.max(daysBetween(addDaysStr(asOnDateStr,1), en), 0);
+  return rate * futureSpan;
+}
 function reconstructBalanceAsOn(emp, asOnDateStr){
   const baseline = (emp.BalanceAsOnDate||'').slice(0,10);
   if(baseline && asOnDateStr < baseline){
@@ -1221,25 +1251,28 @@ function reconstructBalanceAsOn(emp, asOnDateStr){
     EL: emp.EL_Balance, HPL: emp.HPL_Balance, CL: emp.CL_Balance,
     RH: emp.RH_Balance, SCL: emp.SCL_Balance, CompOff: emp.CompOff_Balance
   };
-  const after = STATE.transactions.filter(t=>t.EmpID===emp.EmpID && (t.StartDate||'').slice(0,10) > asOnDateStr);
-  after.forEach(t=>{
-    const days = Number(t.Days)||0;
+  const relevant = STATE.transactions.filter(t=>t.EmpID===emp.EmpID);
+  relevant.forEach(t=>{
+    const portion = futurePortionDays(t, asOnDateStr);
+    if(portion<=0) return;
     if(t.LeaveType==='AutoCredit'){
-      bal.EL -= Number(t.EL_Delta||0);
-      bal.HPL -= Number(t.HPL_Delta||0);
-      // Note: CL/RH resets performed by auto-credit are not reversed here
-      // (a reset has no fixed prior value to restore), so CL/RH figures in
-      // an as-on-date report are only exact within the current CL/RH cycle.
+      const s = (t.StartDate||'').slice(0,10);
+      if(s > asOnDateStr){
+        bal.EL -= Number(t.EL_Delta||0);
+        bal.HPL -= Number(t.HPL_Delta||0);
+      }
     } else if(t.LeaveType==='Commuted'){
-      bal.HPL += days*2;
+      bal.HPL += portion*2;
     } else if(t.LeaveType==='CompOff'){
-      bal.CompOff -= days;
+      bal.CompOff -= portion;
     } else if(t.LeaveType==='Maternity' || t.LeaveType==='Paternity'){
       // no balance field affected
     } else if(bal[t.LeaveType]!==undefined){
-      bal[t.LeaveType] += days;
+      bal[t.LeaveType] += portion;
     }
   });
+  // round to 1 decimal to avoid floating-point noise from proportional splits
+  Object.keys(bal).forEach(k=> bal[k] = Math.round(bal[k]*10)/10 );
   return bal;
 }
 document.getElementById('allBalBtn').onclick = ()=>{
