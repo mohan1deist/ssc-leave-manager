@@ -364,6 +364,18 @@ select option{background:#17223A;color:#EDEFF5;}
       </div>
       <div class="grid grid-4" id="dashEmpCards"></div>
 
+      <div class="section-title"><span>Retirements</span><div class="rule"></div></div>
+      <div class="grid grid-2">
+        <div class="card">
+          <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">Retiring this year</div>
+          <div class="bday-row" id="retireYear"></div>
+        </div>
+        <div class="card">
+          <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">Retiring within 1 year</div>
+          <div class="bday-row" id="retireOneYear"></div>
+        </div>
+      </div>
+
       <div class="section-title"><span>Birthdays</span><div class="rule"></div></div>
       <div class="grid grid-3">
         <div class="card">
@@ -841,9 +853,30 @@ function renderAll(){
 }
 function renderDashboard(){
   renderDashEmpCards();
+  renderRetireRow('retireYear', retireFilter('year'));
+  renderRetireRow('retireOneYear', retireFilter('oneYear'));
   renderBdayRow('bdayToday', bdayFilter(0,'day'));
   renderBdayRow('bdayMonth', bdayFilter(0,'month'));
   renderBdayRow('bdayNext', bdayFilter(1,'month'));
+}
+function retireFilter(mode){
+  const now = new Date();
+  const oneYearOut = new Date(); oneYearOut.setFullYear(now.getFullYear()+1);
+  return STATE.employees.filter(e=>{
+    if(!e.RetirementDate) return false;
+    const d = new Date(e.RetirementDate); if(isNaN(d)) return false;
+    if(d < now) return false; // already retired
+    if(mode==='year') return d.getFullYear()===now.getFullYear();
+    return d <= oneYearOut;
+  }).sort((a,b)=>new Date(a.RetirementDate)-new Date(b.RetirementDate));
+}
+function renderRetireRow(elId, list){
+  const el = document.getElementById(elId);
+  if(!list.length){ el.innerHTML = `<div style="color:var(--muted);font-size:12.5px;">None</div>`; return; }
+  el.innerHTML = list.map(e=>{
+    const d = new Date(e.RetirementDate);
+    return `<div class="bday-chip"><div class="who">${e.Name}</div><div class="when">${d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}</div></div>`;
+  }).join('');
 }
 function renderDashEmpCards(){
   const cadre = document.getElementById('dashFilterCadre').value;
