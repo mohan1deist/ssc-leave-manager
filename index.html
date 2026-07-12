@@ -1253,15 +1253,19 @@ function reconstructBalanceAsOn(emp, asOnDateStr){
   };
   const relevant = STATE.transactions.filter(t=>t.EmpID===emp.EmpID);
   relevant.forEach(t=>{
-    const portion = futurePortionDays(t, asOnDateStr);
-    if(portion<=0) return;
     if(t.LeaveType==='AutoCredit'){
+      // Single-day event — no proportional split needed, just check
+      // whether the credit's run-date falls after the cutoff.
       const s = (t.StartDate||'').slice(0,10);
       if(s > asOnDateStr){
         bal.EL -= Number(t.EL_Delta||0);
         bal.HPL -= Number(t.HPL_Delta||0);
       }
-    } else if(t.LeaveType==='Commuted'){
+      return;
+    }
+    const portion = futurePortionDays(t, asOnDateStr);
+    if(portion<=0) return;
+    if(t.LeaveType==='Commuted'){
       bal.HPL += portion*2;
     } else if(t.LeaveType==='CompOff'){
       bal.CompOff -= portion;
