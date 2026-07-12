@@ -260,6 +260,13 @@ select option{background:#17223A;color:#EDEFF5;}
 .toast.show{transform:translateY(0);opacity:1;}
 .toast.err{border-color:rgba(228,99,111,0.4);}
 .print-letterhead{display:none;}
+.grant-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid var(--hairline);flex-wrap:wrap;}
+.grant-row:last-child{border-bottom:none;}
+.grant-info .name{font-size:13.5px;font-weight:600;}
+.grant-info .status{font-size:11.5px;color:var(--muted);margin-top:2px;}
+.grant-info .status.active{color:var(--ok);}
+.grant-controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.grant-controls select, .grant-controls input{background:var(--surface);border:1px solid var(--hairline);border-radius:8px;padding:7px 10px;font-size:12.5px;color:var(--text);}
 @media print{
   body{background:#fff !important;color:#111 !important;}
   .sidebar,.topbar,.toolbar,.overlay,#printProfileBtn,#addTxnBtn,.grid.grid-2,.card:has(#runSummaryBtn),.card:has(#printStmtBtn),.card:has(#elhplBtn),.card:has(#allBalBtn){display:none !important;}
@@ -478,6 +485,11 @@ select option{background:#17223A;color:#EDEFF5;}
         <div class="form-field" style="margin-bottom:12px;"><input type="text" id="viewerPassInput" placeholder="Set viewer password (optional)"></div>
         <button class="btn btn-primary" id="saveSettingsBtn">Save</button>
       </div>
+      <div class="card" style="max-width:640px;margin-top:16px;">
+        <h3 style="font-size:15px;margin-bottom:6px;">Editor permissions</h3>
+        <div style="color:var(--muted);font-size:12.5px;margin-bottom:14px;">Grant an Editor temporary access to admin-only functions. Access automatically expires at the chosen time.</div>
+        <div id="grantList"></div>
+      </div>
       <div class="card" style="max-width:480px;margin-top:16px;">
         <h3 style="font-size:15px;margin-bottom:14px;">Backend</h3>
         <div style="color:var(--muted);font-size:12.5px;">Data syncs automatically with Google Sheets every 5 minutes, and on every add / edit. Use "Sync now" on the dashboard to force an immediate sync.</div>
@@ -584,6 +596,98 @@ let STATE = {
   employees: [], transactions: [], archived: [], settings: {},
   currentEmpId: null, editingTxnId: null,
 };
+
+/* ---------- Editor permission grants ---------- */
+const GRANTABLE_FUNCTIONS = [
+  {key:'archiveEmployee', label:'Archive employee'},
+  {key:'restoreEmployee', label:'Restore / purge archived employee'},
+  {key:'editTxn', label:'Edit leave transactions'},
+  {key:'deleteTxn', label:'Delete leave transactions'},
+  {key:'manageSettings', label:'Change settings & passwords'},
+];
+function getEditorGrants(){
+  try{ return JSON.parse(STATE.settings.editorGrants||'{}'); }catch(e){ return {}; }
+}
+function canDo(fnKey){
+  if(STATE.role==='admin') return true;
+  if(STATE.role!=='editor') return false;
+  const grants = getEditorGrants();
+  const exp = grants[fnKey];
+  return !!exp && new Date(exp) > new Date();
+}
+async function setGrant(fnKey, expiryISO){
+  const grants = getEditorGrants();
+  if(expiryISO) grants[fnKey] = expiryISO; else delete grants[fnKey];
+  STATE.settings.editorGrants = JSON.stringify(grants);
+  await apiPost('lms_updateSettings', {editorGrants: STATE.settings.editorGrants});
+  stampSeal();
+  renderGrantList();
+  applyRoleUI();
+}
+function durationToExpiry(value, customVal){
+  const now = new Date();
+  switch(value){
+    case '15m': return new Date(now.getTime()+15*60000).toISOString();
+    case '30m': return new Date(now.getTime()+30*60000).toISOString();
+    case '1h': return new Date(now.getTime()+60*60000).toISOString();
+    case '2h': return new Date(now.getTime()+2*60*60000).toISOString();
+    case '6h': return new Date(now.getTime()+6*60*60000).toISOString();
+    case 'today': { const d=new Date(); d.setHours(23,59,59,999); return d.toISOString(); }
+    case '1w': return new Date(now.getTime()+7*24*60*60000).toISOString();
+    case 'custom': return customVal ? new Date(customVal).toISOString() : null;
+    default: return null;
+  }
+}
+function renderGrantList(){
+  const wrap = document.getElementById('grantList');
+  if(!wrap) return;
+  const grants = getEditorGrants();
+  wrap.innerHTML = GRANTABLE_FUNCTIONS.map(f=>{
+    const exp = grants[f.key];
+    const active = exp && new Date(exp) > new Date();
+    return `
+    <div class="grant-row">
+      <div class="grant-info">
+        <div class="name">${f.label}</div>
+        <div class="status ${active?'active':''}">${active ? 'Active until '+new Date(exp).toLocaleString('en-IN') : 'Not granted'}</div>
+      </div>
+      <div class="grant-controls">
+        <select id="dur_${f.key}">
+          <option value="15m">15 min</option>
+          <option value="30m">30 min</option>
+          <option value="1h">1 hour</option>
+          <option value="2h">2 hours</option>
+          <option value="6h">6 hours</option>
+          <option value="today">Today</option>
+          <option value="1w">1 week</option>
+          <option value="custom">Custom</option>
+        </select>
+        <input type="datetime-local" id="custom_${f.key}" style="display:none;">
+        <button class="btn btn-primary" style="padding:7px 12px;font-size:12px;" data-grant="${f.key}">Grant</button>
+        ${active?`<button class="btn btn-ghost" style="padding:7px 12px;font-size:12px;" data-revoke="${f.key}">Revoke</button>`:''}
+      </div>
+    </div>`;
+  }).join('');
+  GRANTABLE_FUNCTIONS.forEach(f=>{
+    const sel = document.getElementById('dur_'+f.key);
+    const custom = document.getElementById('custom_'+f.key);
+    sel.addEventListener('change', ()=>{ custom.style.display = sel.value==='custom' ? 'inline-block':'none'; });
+  });
+  wrap.querySelectorAll('[data-grant]').forEach(b=>{
+    b.onclick = ()=>{
+      const key = b.dataset.grant;
+      const sel = document.getElementById('dur_'+key).value;
+      const custom = document.getElementById('custom_'+key).value;
+      const expiry = durationToExpiry(sel, custom);
+      if(!expiry){ toast('Pick a custom date/time first.', true); return; }
+      setGrant(key, expiry);
+      toast(GRANTABLE_FUNCTIONS.find(f=>f.key===key).label + ' granted.');
+    };
+  });
+  wrap.querySelectorAll('[data-revoke]').forEach(b=>{
+    b.onclick = ()=>{ setGrant(b.dataset.revoke, null); toast('Access revoked.'); };
+  });
+}
 
 /* ---------- Utilities ---------- */
 function uid(p){ return p+'_'+Date.now()+'_'+Math.floor(Math.random()*10000); }
@@ -706,8 +810,10 @@ function applyRoleUI(){
   const isAdmin = STATE.role==='admin';
   document.getElementById('addEmpBtn').style.display = canEdit ? 'inline-flex':'none';
   document.getElementById('addTxnBtn').style.display = canEdit ? 'inline-flex':'none';
-  document.querySelector('[data-view="settings"]').style.display = isAdmin ? 'flex':'none';
+  document.querySelector('[data-view="settings"]').style.display = (isAdmin || canDo('manageSettings')) ? 'flex':'none';
   document.querySelector('[data-view="archive"]').style.display = canEdit ? 'flex':'none';
+  const grantSection = document.getElementById('grantList');
+  if(grantSection) grantSection.closest('.card').style.display = isAdmin ? 'block':'none';
 }
 
 /* ---------- Nav ---------- */
@@ -729,6 +835,8 @@ function renderAll(){
   renderEmployeeTable();
   renderArchiveTable();
   populateReportSelects();
+  renderGrantList();
+  applyRoleUI();
   if(STATE.currentEmpId) renderProfile(STATE.currentEmpId);
 }
 function renderDashboard(){
@@ -928,7 +1036,9 @@ function renderProfile(empId){
   const e = STATE.employees.find(x=>x.EmpID===empId); if(!e) return;
   document.getElementById('profileGenAt').textContent = e.Name + ' · Generated ' + new Date().toLocaleString('en-IN');
   const canEdit = STATE.role==='admin' || STATE.role==='editor';
-  const isAdmin = STATE.role==='admin';
+  const canArchive = canDo('archiveEmployee');
+  const canEditTxn = canDo('editTxn');
+  const canDeleteTxn = canDo('deleteTxn');
   document.getElementById('profileCard').innerHTML = `
     <div class="profile-head">
       <div>
@@ -937,7 +1047,7 @@ function renderProfile(empId){
       </div>
       <div style="display:flex;gap:8px;">
         ${canEdit?`<button class="btn btn-ghost" id="editEmpBtn">Edit profile</button>`:''}
-        ${isAdmin?`<button class="btn btn-danger" id="archiveEmpBtn">Archive</button>`:''}
+        ${canArchive?`<button class="btn btn-danger" id="archiveEmpBtn">Archive</button>`:''}
       </div>
     </div>
     <div style="display:flex;flex-wrap:wrap;gap:18px;font-size:13px;color:var(--muted);margin-top:10px;">
@@ -956,10 +1066,10 @@ function renderProfile(empId){
     <div style="font-size:12px;color:var(--muted);">Live balance as on ${fmtDate(todayISO())} · opening balance was recorded as on ${fmtDate(e.BalanceAsOnDate)}</div>
   `;
   if(canEdit) document.getElementById('editEmpBtn').onclick = ()=>openEditEmployee(e);
-  if(isAdmin){
+  if(canArchive){
     document.getElementById('archiveEmpBtn').onclick = async ()=>{
       if(!confirm(`Archive ${e.Name}? Their record moves to Archive and can be restored later.`)) return;
-      await apiPost('lms_archiveEmployee', {empId:e.EmpID, by:'admin'});
+      await apiPost('lms_archiveEmployee', {empId:e.EmpID, by:STATE.role});
       STATE.employees = STATE.employees.filter(x=>x.EmpID!==e.EmpID);
       stampSeal(); toast('Employee archived.');
       document.getElementById('view-profile').classList.remove('active');
@@ -978,11 +1088,13 @@ function renderProfile(empId){
       <td>${t.Days}</td>
       <td>${t.Reason||''}</td>
       <td>${t.EnteredBy||''}</td>
-      <td>${isAdmin?`<button class="icon-btn" data-edit="${t.TxnID}">Edit</button> <button class="icon-btn" data-del="${t.TxnID}">Delete</button>`:''}</td>
+      <td>${canEditTxn?`<button class="icon-btn" data-edit="${t.TxnID}">Edit</button>`:''} ${canDeleteTxn?`<button class="icon-btn" data-del="${t.TxnID}">Delete</button>`:''}</td>
     </tr>`).join('') || `<tr><td colspan="7"><div class="empty-state">No leave entries yet.</div></td></tr>`;
 
-  if(isAdmin){
+  if(canEditTxn){
     document.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>openEditTxn(b.dataset.edit));
+  }
+  if(canDeleteTxn){
     document.querySelectorAll('[data-del]').forEach(b=>b.onclick=async ()=>{
       if(!confirm('Delete this leave entry? This will restore the balance.')) return;
       const t = STATE.transactions.find(x=>x.TxnID===b.dataset.del);
@@ -1148,16 +1260,16 @@ document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>{
 
 /* ---------- Archive ---------- */
 function renderArchiveTable(){
-  const isAdmin = STATE.role==='admin';
+  const canRestore = canDo('restoreEmployee');
   document.getElementById('archiveTableBody').innerHTML = STATE.archived.map(e=>`
     <tr>
       <td>${e.Name}</td>
       <td><span class="cadre-tag ${e.Cadre==='CAPF'?'capf':'noncapf'}">${e.Cadre}</span></td>
       <td>${e.Designation||''}</td>
       <td>${fmtDate(e.ArchivedAt)}</td>
-      <td>${isAdmin?`<button class="icon-btn" data-restore="${e.EmpID}">Restore</button> <button class="icon-btn" data-purge="${e.EmpID}">Delete permanently</button>`:''}</td>
+      <td>${canRestore?`<button class="icon-btn" data-restore="${e.EmpID}">Restore</button> <button class="icon-btn" data-purge="${e.EmpID}">Delete permanently</button>`:''}</td>
     </tr>`).join('') || `<tr><td colspan="5"><div class="empty-state">Archive is empty.</div></td></tr>`;
-  if(isAdmin){
+  if(canRestore){
     document.querySelectorAll('[data-restore]').forEach(b=>b.onclick=async ()=>{
       await apiPost('lms_restoreEmployee', {empId:b.dataset.restore});
       const e = STATE.archived.find(x=>x.EmpID===b.dataset.restore);
@@ -1300,12 +1412,14 @@ document.getElementById('allBalBtn').onclick = ()=>{
 
 /* ---------- Settings ---------- */
 document.getElementById('saveSettingsBtn').onclick = async ()=>{
+  if(!canDo('manageSettings')){ toast('You do not have access to change settings.', true); return; }
   const pass = document.getElementById('viewerPassInput').value;
   STATE.settings.viewerPassword = pass;
   await apiPost('lms_updateSettings', {viewerPassword: pass});
   stampSeal(); toast('Settings saved.');
 };
 document.getElementById('saveRolePassBtn').onclick = async ()=>{
+  if(!canDo('manageSettings')){ toast('You do not have access to change settings.', true); return; }
   const newAdmin = document.getElementById('adminPassInput').value.trim();
   const newEditor = document.getElementById('editorPassInput').value.trim();
   const payload = {};
